@@ -1,7 +1,7 @@
 # coding:utf8
 from .sources.sina import Sina
 from .sources.tencent import Tencent
-
+from .sources.eastmoney import EastMoney
 
 datasources = dict()
 
@@ -10,6 +10,8 @@ def _source_key(source):
         return 'sina'
     if source in ['qq', 'tencent']:
         return 'tencent'
+    if source in ['em', 'eastmoney']:
+        return 'eastmoney'
 
 def rtsource(source):
     source_key = _source_key(source)
@@ -18,9 +20,16 @@ def rtsource(source):
             datasources[source_key] = Sina()
         elif source_key == 'tencent':
             datasources[source_key] = Tencent()
+        elif source_key == 'eastmoney':
+            datasources[source_key] = EastMoney()
 
     return datasources.get(source_key)
 
+def _fetch(sources, apiname, method, *args, **kwargs):
+    for s in sources:
+        dsource = rtsource(s)
+        if dsource and getattr(dsource, apiname) is not None:
+            return getattr(dsource, method)(*args, **kwargs)
 
 klsourcesm = ['sina', 'tencent']
 def mklines(stocks, kltype=1, length=320):
@@ -34,16 +43,14 @@ qsources = ['sina', 'tencent']
 def quotes(stocks):
     return _fetch(qsources, 'qtapi', 'quotes', stocks)
 
+qsources5 = ['sina', 'tencent', 'eastmoney']
+def quotes5(stocks):
+    return _fetch(qsources5, 'qt5api', 'quotes5', stocks)
+
 tsources = ['sina', 'tencent']
 def tlines(stocks):
     return _fetch(tsources, 'tlineapi', 'tlines', stocks)
 
-
-def _fetch(sources, apiname, method, *args, **kwargs):
-    for s in sources:
-        dsource = rtsource(s)
-        if dsource and getattr(dsource, apiname) is not None:
-            return getattr(dsource, method)(*args, **kwargs)
 
 def klines(stocks, kltype=1, length=320):
     if kltype in [101, 102, 103, 104, 105, 106]:

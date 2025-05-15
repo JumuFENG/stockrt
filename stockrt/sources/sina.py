@@ -50,7 +50,7 @@ class Sina(rtbase.rtbase):
         return self.qtapi % (int(time.time() * 1000), ','.join(stocks))
 
     def format_quote_response(self, rep_data):
-        stocks_detail = "".join(rep_data)
+        stocks_detail = "".join([rsp for _, rsp in rep_data])
         stocks_detail = self.del_null_data_stock.sub('', stocks_detail)
         stocks_detail = stocks_detail.replace(' ', '')
         grep_str = self.grep_detail_with_prefix
@@ -98,7 +98,7 @@ class Sina(rtbase.rtbase):
         return self.tlineapi % stock
 
     def format_tline_response(self, rep_data):
-        return dict([[c, v['result']['data']] for c,v in rep_data])
+        return dict([[c, v['result']['data']] for c,v in json.loads(rep_data)])
 
     def get_mkline_url(self, stock, kltype='1', length=320):
         return self.mklineapi % (stock, kltype, length)

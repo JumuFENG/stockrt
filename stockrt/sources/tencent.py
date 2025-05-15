@@ -50,12 +50,6 @@ class Tencent(rtbase.rtbase):
         return self.qtapi % (','.join(stocks))
 
     def parse_quote(self, stock):
-        def _safe_float(s: str) -> Optional[float]:
-            try:
-                return float(s)
-            except ValueError:
-                return None
-
         def _safe_acquire_float(stock: list, idx: int) -> Optional[float]:
             """
             There are some securities that only have 50 fields. See example below:
@@ -67,13 +61,12 @@ class Tencent(rtbase.rtbase):
             '', '0.000', '2.452', '2.006', '"']
             """
             try:
-                return _safe_float(stock[idx])
+                return self._safe_price(stock[idx])
             except IndexError:
                 return None
 
         return {
             "name": stock[1],
-            "code": stock[2],
             "close": float(stock[3]),
             "lclose": float(stock[4]),
             "open": float(stock[5]),
@@ -108,20 +101,20 @@ class Tencent(rtbase.rtbase):
             "high": float(stock[33]),
             "low": float(stock[34]),
             "价格/成交量(手)/成交额": stock[35],
-            "成交量(手)": int(stock[36]) * 100,
-            "成交额(万)": float(stock[37]) * 10000,
-            "turnover": _safe_float(stock[38]),
-            "PE": _safe_float(stock[39]),
+            "volume": int(stock[36]) * 100,
+            "amount": float(stock[37]) * 10000,
+            "turnover": self._safe_price(stock[38]),
+            "PE": self._safe_price(stock[39]),
             "unknown": stock[40],
             "high_2": float(stock[41]),  # 意义不明
             "low_2": float(stock[42]),  # 意义不明
             "振幅": float(stock[43]),
-            "流通市值": _safe_float(stock[44]),
-            "总市值": _safe_float(stock[45]),
+            "cmc": self._safe_price(stock[44]), # 流通市值
+            "mc": self._safe_price(stock[45]), # 总市值
             "PB": float(stock[46]),
             "涨停价": float(stock[47]),
             "跌停价": float(stock[48]),
-            "量比": _safe_float(stock[49]),
+            "量比": self._safe_price(stock[49]),
             "委差": _safe_acquire_float(stock, 50),
             "均价": _safe_acquire_float(stock, 51),
             "市盈(动)": _safe_acquire_float(stock, 52),
@@ -129,7 +122,7 @@ class Tencent(rtbase.rtbase):
         }
 
     def format_quote_response(self, rep_data):
-        stocks_detail = "".join(rep_data)
+        stocks_detail = "".join([rsp for _, rsp in rep_data])
         stock_details = stocks_detail.split(";")
         stock_dict = dict()
         for stock_detail in stock_details:
@@ -144,7 +137,7 @@ class Tencent(rtbase.rtbase):
         return self.tlineapi % stock
 
     def format_tline_response(self, rep_data):
-        return dict([[c, v['data'][c]['data']['data']] for c, v in rep_data])
+        return dict([[c, v['data'][c]['data']['data']] for c, v in json.loads(rep_data)])
 
     def get_mkline_url(self, stock, kltype=1, length=320):
         return self.mklineapi % (stock, kltype, length)
