@@ -157,7 +157,14 @@ class Tencent(rtbase.rtbase):
             kdata = json.loads(v)
             for k, kl in kdata['data'][c].items():
                 if k.startswith('m'):
-                    result[c] = [[f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}'] + x[1:6] for x in kl]
+                    result[c] = [{
+                        'time': f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}',
+                        'open': float(x[1]),
+                        'close': float(x[2]),
+                        'high': float(x[3]),
+                        'low': float(x[4]),
+                        'volume': int(float(x[5]) * 100)
+                    } for x in kl]
                     break
         return result
 
@@ -167,7 +174,14 @@ class Tencent(rtbase.rtbase):
             kdata = json.loads(v)
             for k, kl in kdata['data'][c].items():
                 if k.startswith('qfq') or k in ['day', 'week', 'month', 'season', 'year']:
-                    result[c] = kl
+                    result[c] = [{
+                        'time': x[0],
+                        'open': float(x[1]),
+                        'close': float(x[2]),
+                        'high': float(x[3]),
+                        'low': float(x[4]),
+                        'volume': int(float(x[5]) * 100)
+                    } for x in kl]
                     break
         return result
 

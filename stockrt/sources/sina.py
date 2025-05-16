@@ -126,7 +126,20 @@ class Sina(rtbase.rtbase):
         for c, kltxt in rep_data:
             m = re.search(kpattern, kltxt)
             if m:
-                result[c] = json.loads(m.group(1))
+                karr = []
+                for x in json.loads(m.group(1)):
+                    kldetail = {
+                        'time': x['day'],
+                        'open': float(x['open']),
+                        'close': float(x['close']),
+                        'high': float(x['high']),
+                        'low': float(x['low']),
+                        'volume': int(x['volume']),
+                    }
+                    if 'amount' in x:
+                        kldetail['amount'] = float(x['amount'])
+                    karr.append(kldetail)
+                result[c] = karr
         return result
 
     def get_dkline_url(self, stock, kltype=101, length=320):

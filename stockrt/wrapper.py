@@ -41,6 +41,7 @@ class FetchWrapper(object):
             return 'tencent'
         if source in ['em', 'eastmoney']:
             return 'eastmoney'
+        return source
 
     source_objects = dict()
     @classmethod
@@ -59,6 +60,8 @@ class FetchWrapper(object):
                 self.source_objects[usrc] = Tencent()
             elif usrc == 'eastmoney':
                 self.source_objects[usrc] = EastMoney()
+            else:
+                raise NotImplementedError(f"not yet implemented data source: {usrc}")
 
         return self.source_objects.get(usrc)
 
@@ -169,7 +172,7 @@ def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     return wrapper.fetch(stocks)
 
 def mklines(stocks: Union[str, List[str]], kltype=1, length=320) -> Dict[str, Any]:
-    wrapper = _get_wrapper('mklineapi', 'mklines', ('tencent', 'eastmoney', 'sina'))
+    wrapper = _get_wrapper('mklineapi', 'mklines', ('eastmoney', 'sina', 'tencent'))
     return wrapper.fetch(stocks, kltype=kltype, length=length)
 
 def dklines(stocks: Union[str, List[str]], kltype=101, length=320) -> Dict[str, Any]:

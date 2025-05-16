@@ -206,9 +206,12 @@ class rtbase(abc.ABC):
             'wk': 102, 'mon': 103, 'hy': 105, 'yr': 106, 'day': 101, 'week': 102,
             'month': 103, 'quarter': 104, 'halfyear': 105, 'year': 106
             }
-        if isinstance(kltype, str) and kltype in validkls:
-            kltype = validkls[kltype]
-        elif not isinstance(kltype, int):
+        if isinstance(kltype, str):
+            if kltype in validkls:
+                kltype = validkls[kltype]
+            elif kltype.isdigit():
+                kltype = int(kltype)
+        if not isinstance(kltype, int):
             raise ValueError(f"Invalid kltype: {kltype}")
 
         if int(kltype) < 15 or int(kltype) % 15 == 0:

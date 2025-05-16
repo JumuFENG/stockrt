@@ -13,7 +13,7 @@ tline:
 http://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&secid=1.603536&ndays=1&iscr=1&iscca=0
 
 kline:
-https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.601136&klt=101&fqt=1&lmt=100&end=20500000&iscca=1&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64
+https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.601136&klt=101&fqt=1&lmt=100&end=20500000&iscca=1&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61
 &ut=f057cbcbce2a86e2866ab8877db1d059&forcect=1
 
 '''
@@ -158,7 +158,24 @@ class EastMoney(rtbase.rtbase):
         stock_dict = dict()
         for code, rsp in rep_data:
             stocks_detail = json.loads(rsp)
-            stock_dict[code] = stocks_detail['data']['klines']
+            klines = stocks_detail['data']['klines']
+            klarr = []
+            for kline in klines:
+                kdata = kline.split(',')
+                klarr.append({
+                    'time': kdata[0],
+                    'open': kdata[1],
+                    'close': kdata[2],
+                    'high': kdata[3],
+                    'low': kdata[4],
+                    'volume': int(kdata[5]) * 100,
+                    'amount': float(kdata[6]),
+                    'amplitude': self._safe_price(kdata[7])/100,
+                    'change': self._safe_price(kdata[8])/100,
+                    'change_px': self._safe_price(kdata[9]),
+                    'turnover': self._safe_price(kdata[10])/100})
+            stock_dict[code] = klarr
+
         return stock_dict
 
     def get_dkline_url(self, stock, kltype='101', length=320):
