@@ -4,6 +4,21 @@ import time
 import json
 from . import rtbase
 
+"""
+reference: https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
+
+K线
+
+1: https://quotes.sina.cn/cn/api/jsonp_v2.php/x/CN_MarketDataService.getKLineData?symbol=sh601798&scale=1&ma=no&datalen=24
+
+2: http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh600798&scale=120&ma=no&datalen=20
+
+接口1返回的是jsonp数据，接口2返回的是json数据，接口2没有scale 1/120
+
+分时数据:
+"""
+
+
 class Sina(rtbase.rtbase):
     quote_max_num = 800
     grep_detail = re.compile(
@@ -37,7 +52,7 @@ class Sina(rtbase.rtbase):
 
     @property
     def dklineapi(self):
-        return None
+        return self.mklineapi
 
     def _get_headers(self):
         headers = super()._get_headers()
@@ -51,6 +66,7 @@ class Sina(rtbase.rtbase):
 
     def format_quote_response(self, rep_data):
         stocks_detail = "".join([rsp for _, rsp in rep_data])
+        codes = sum([c for c,_ in rep_data], [])
         stocks_detail = self.del_null_data_stock.sub('', stocks_detail)
         stocks_detail = stocks_detail.replace(' ', '')
         grep_str = self.grep_detail_with_prefix
@@ -58,7 +74,8 @@ class Sina(rtbase.rtbase):
         stock_dict = dict()
         for stock_match_object in result:
             stock = stock_match_object.groups()
-            stock_dict[stock[0]] = dict(
+            code = stock[0] if stock[0] in codes else stock[0][2:] if stock[0][2:] in codes else stock[0]
+            stock_dict[code] = dict(
                 name=stock[1],
                 open=float(stock[2]),
                 lclose=float(stock[3]),
@@ -112,6 +129,10 @@ class Sina(rtbase.rtbase):
                 result[c] = json.loads(m.group(1))
         return result
 
-    def get_dkline_url(self, stock, kltype='1', length=320):
-        raise NotImplementedError('no valid method to get dklines via sina')
+    def get_dkline_url(self, stock, kltype=101, length=320):
+        klt2scale = {101: 240, 102: 1200, 103: 7200, 106: 86400}
+        assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
+        return self.mklineapi % (stock, klt2scale[kltype], length)
 
+    def format_dkline_response(self, rep_data):
+        return self.format_mkline_response(rep_data)

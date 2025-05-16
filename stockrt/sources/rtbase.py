@@ -45,7 +45,6 @@ def get_fullcode(stock_code):
         return f"sh{stock_code}"
     return f"sz{stock_code}"
 
-
 class rtbase(abc.ABC):
     # 每次请求的最大股票数
     quote_max_num = 800
@@ -114,24 +113,25 @@ class rtbase(abc.ABC):
             stocks = [stocks]
 
         results = []
-        
+
         def fetch_single(stock):
             try:
-                url = url_func(stock, **url_kwargs)
+                fcode = get_fullcode(stock) if isinstance(stock, str) else [get_fullcode(s) for s in stock]
+                url = url_func(fcode, **url_kwargs)
                 data = self.session.get(url, headers=self._get_headers())
                 if data and data.text:
                     return [stock, data.text]
             except Exception as e:
                 self.logger.error(f"处理股票数据出错: {stock} {str(e)}")
             return None
-        
+
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
             for future in as_completed(futures):
                 data = future.result()
                 if data is not None:
                     results.append(data)
-        
+
         return format_func(results)
 
     @staticmethod

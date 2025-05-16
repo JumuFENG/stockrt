@@ -5,9 +5,16 @@ import json
 from . import rtbase
 
 '''
-
+quotes:
 https://hsmarketwg.eastmoney.com/api/SHSZQuoteSnapshot?id=601136&callback=
 https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=1.601136&fields=f2,f12
+
+tline:
+http://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&secid=1.603536&ndays=1&iscr=1&iscca=0
+
+kline:
+https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.601136&klt=101&fqt=1&lmt=100&end=20500000&iscca=1&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64
+&ut=f057cbcbce2a86e2866ab8877db1d059&forcect=1
 
 '''
 
@@ -21,7 +28,7 @@ class EastMoney(rtbase.rtbase):
             "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=%s&fields="
             "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,f21,f22,f23,f115"
         )
-    
+
     @property
     def qt5api(self):
         return (
@@ -33,15 +40,23 @@ class EastMoney(rtbase.rtbase):
 
     @property
     def tlineapi(self):
-        return ('')
+        return (
+            'http://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1='
+            'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58'
+            '&secid=%s&ndays=1&iscr=1&iscca=0'
+        )
 
     @property
     def mklineapi(self):
-        return ('')
+        return (
+            'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s&klt=%d&fqt=1&lmt=%d'
+            '&end=20500000&iscca=1&fields1=f1,f2,f3,f4,f5,f6,f7,f8'
+            '&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64'
+        )
 
     @property
     def dklineapi(self):
-        return None
+        return self.mklineapi
 
     @staticmethod
     def get_secid(code):
@@ -56,11 +71,12 @@ class EastMoney(rtbase.rtbase):
 
     def format_quote_response(self, rep_data):
         stock_dict = dict()
-        for _, rsp in rep_data:
+        for codes, rsp in rep_data:
             stocks_detail = json.loads(rsp)
             for stock in stocks_detail['data']['diff']:
                 fcode = self.secid_to_fullcode(f"{stock['f13']}.{stock['f12']}")
-                stock_dict[fcode] = {
+                code = fcode if fcode in codes else stock['f12'] if stock['f12'] in codes else fcode
+                stock_dict[code] = {
                     'name': stock['f14'],
                     'close': self._safe_price(stock['f2']),
                     'last_px': self._safe_price(stock['f2']),
@@ -127,9 +143,27 @@ class EastMoney(rtbase.rtbase):
 
     def get_tline_url(self, stock):
         return self.tlineapi % self.get_secid(stock)
-    
+
+    def format_tline_response(self, rep_data):
+        stock_dict = dict()
+        for code, rsp in rep_data:
+            stocks_detail = json.loads(rsp)
+            stock_dict[code] = stocks_detail['data']['trends']
+        return stock_dict
+
     def get_mkline_url(self, stock, kltype='1', length=320):
         return self.mklineapi % (self.get_secid(stock), kltype, length)
-    
+
+    def format_mkline_response(self, rep_data):
+        stock_dict = dict()
+        for code, rsp in rep_data:
+            stocks_detail = json.loads(rsp)
+            stock_dict[code] = stocks_detail['data']['klines']
+        return stock_dict
+
     def get_dkline_url(self, stock, kltype='101', length=320):
         return self.dklineapi % (self.get_secid(stock), kltype, length)
+
+    def format_dkline_response(self, rep_data):
+        return self.format_mkline_response(rep_data)
+

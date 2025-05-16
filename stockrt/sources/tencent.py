@@ -5,18 +5,19 @@ import json
 from typing import Optional
 from . import rtbase
 
-# """
-# url 参数改动
-# 股票代码 :sh603444
-# k线数：320
-# url = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh603444,m5,,320&_var=m5_today&r=0.7732845199699612"
+"""
+reference: https://stockapp.finance.qq.com/mstats/
 
-# reference: https://stockapp.finance.qq.com/mstats/
+url 参数改动
+股票代码 :sh603444
+k线数：320
+url = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh603444,m5,,320&_var=m5_today&r=0.7732845199699612"
 
-# 分时数据:
-# https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var=&code=sh603444&r=0.8169133625890732
-# https://web.ifzq.gtimg.cn/appstock/app/day/query?_var=&code=sh603444&r=0.8305712721067519
-# """
+
+分时数据:
+https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var=&code=sh603444&r=0.8169133625890732
+https://web.ifzq.gtimg.cn/appstock/app/day/query?_var=&code=sh603444&r=0.8305712721067519
+"""
 
 class Tencent(rtbase.rtbase):
     quote_max_num = 60
@@ -25,7 +26,7 @@ class Tencent(rtbase.rtbase):
     @property
     def qtapi(self):
         return "http://qt.gtimg.cn/q=%s"
-    
+
     @property
     def tlineapi(self):
         return 'https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var=&code=%s'
@@ -123,14 +124,16 @@ class Tencent(rtbase.rtbase):
 
     def format_quote_response(self, rep_data):
         stocks_detail = "".join([rsp for _, rsp in rep_data])
+        codes = sum([c for c,_ in rep_data], [])
         stock_details = stocks_detail.split(";")
         stock_dict = dict()
         for stock_detail in stock_details:
             stock = stock_detail.split("~")
             if len(stock) <= 49:
                 continue
-            stock_code = self.grep_stock_code.search(stock[0]).group()
-            stock_dict[stock_code] = self.parse_quote(stock)
+            s_code = self.grep_stock_code.search(stock[0]).group()
+            code = s_code if s_code in codes else s_code[2:] if s_code[2:] in codes else s_code
+            stock_dict[code] = self.parse_quote(stock)
         return stock_dict
     
     def get_tline_url(self, stock):
@@ -167,3 +170,4 @@ class Tencent(rtbase.rtbase):
                     result[c] = kl
                     break
         return result
+
