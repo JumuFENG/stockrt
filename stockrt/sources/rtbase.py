@@ -47,8 +47,10 @@ class rtbase(abc.ABC):
         assert isinstance(stock_code, str), "stock code need str type"
 
         if stock_code.startswith(("sh", "sz", "zz", "bj")):
+            assert len(stock_code) == 8, "full stock code length should be 8"
             return stock_code
 
+        assert len(stock_code) == 6, "stock code length should be 6"
         bj_head = ("4", "8", "92")
         sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
         if stock_code.startswith(bj_head):
@@ -59,6 +61,9 @@ class rtbase(abc.ABC):
 
     @staticmethod
     def to_int_kltype(kltype: Union[int, str]):
+        if kltype is None:
+            return 101
+
         validkls = {
             '1': 1, '5': 5, '15': 15, '30': 30, '60': 60, '120': 120, '240': 240,
             'd': 101, 'w': 102, 'm': 103, 'q': 104, 'h': 105, 'y': 106,
@@ -70,7 +75,7 @@ class rtbase(abc.ABC):
                 kltype = validkls[kltype]
             elif kltype.isdigit():
                 kltype = int(kltype)
-        if not isinstance(kltype, int):
+        if type(kltype) is not int:
             raise ValueError(f'invalid kltype: {kltype}')
         return kltype
 

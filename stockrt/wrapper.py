@@ -38,6 +38,7 @@ class FetchWrapper(object):
 
     @staticmethod
     def _src_unified(source):
+        source = source.lower()
         if source in ['sina']:
             return 'sina'
         if source in ['qq', 'tencent']:
@@ -177,7 +178,7 @@ def quotes(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     Returns:
         - Dict[str, Any]: 行情数据
     """
-    wrapper = _get_wrapper('qtapi', 'quotes', ('sina', 'tencent', 'eastmoney'))
+    wrapper = _get_wrapper('qtapi', 'quotes', ('tencent', 'sina', 'eastmoney'))
     return wrapper.fetch(stocks)
 
 def quotes5(stocks: Union[str, List[str]]) -> Dict[str, Any]:
