@@ -80,6 +80,7 @@ class Sina(rtbase.rtbase):
                 open=float(stock[2]),
                 lclose=float(stock[3]),
                 close=float(stock[4]),
+                last_px=float(stock[4]),
                 high=float(stock[5]),
                 low=float(stock[6]),
                 buy=float(stock[7]),
@@ -115,7 +116,17 @@ class Sina(rtbase.rtbase):
         return self.tlineapi % stock
 
     def format_tline_response(self, rep_data):
-        return dict([[c, v['result']['data']] for c,v in json.loads(rep_data)])
+        result = {}
+        for c, v in rep_data:
+            data = json.loads(v)['result']['data']
+            result[c] = [{
+                'time': d['m'][:-3],
+                'price': float(d['p']),
+                'volume': int(d['v']),
+                'avg_price': float(d['avg_p']),
+                'amount': int(d['v']) * float(d['p']),
+            } for d in data]
+        return result
 
     def get_mkline_url(self, stock, kltype='1', length=320):
         return self.mklineapi % (stock, kltype, length)

@@ -68,10 +68,10 @@ class Tencent(rtbase.rtbase):
 
         return {
             "name": stock[1],
-            "close": float(stock[3]),
+            "price": float(stock[3]),
             "lclose": float(stock[4]),
             "open": float(stock[5]),
-            "volume": float(stock[6]) * 100,
+            # "volume": float(stock[6]) * 100, # volume duplicated with 36
             "bid_volume": int(stock[7]) * 100,
             "ask_volume": float(stock[8]) * 100,
             "bid1": float(stock[9]),
@@ -95,29 +95,29 @@ class Tencent(rtbase.rtbase):
             "ask5": float(stock[27]),
             "ask5_volume": int(stock[28]) * 100,
             "最近逐笔成交": stock[29],
-            "date": stock[30][0:10],
-            "time": stock[30][10:], # "datetime": datetime.strptime(stock[30], "%Y%m%d%H%M%S"),
-            "涨跌": float(stock[31]),
-            "涨跌(%)": float(stock[32]),
+            # "date": stock[30][0:10],
+            # "time": stock[30][10:], # "datetime": datetime.strptime(stock[30], "%Y%m%d%H%M%S"),
+            "change_px": float(stock[31]),
+            "change": float(stock[32]),
             "high": float(stock[33]),
             "low": float(stock[34]),
-            "价格/成交量(手)/成交额": stock[35],
+            # "价格/成交量(手)/成交额": stock[35],
             "volume": int(stock[36]) * 100,
             "amount": float(stock[37]) * 10000,
             "turnover": self._safe_price(stock[38]),
             "PE": self._safe_price(stock[39]),
-            "unknown": stock[40],
-            "high_2": float(stock[41]),  # 意义不明
-            "low_2": float(stock[42]),  # 意义不明
+            # "unknown": stock[40],
+            # "high_2": float(stock[41]),  # 意义不明
+            # "low_2": float(stock[42]),  # 意义不明
             "振幅": float(stock[43]),
             "cmc": self._safe_price(stock[44]), # 流通市值
             "mc": self._safe_price(stock[45]), # 总市值
             "PB": float(stock[46]),
-            "涨停价": float(stock[47]),
-            "跌停价": float(stock[48]),
+            "top_price": float(stock[47]), # 涨停价
+            "bottom_price": float(stock[48]), # 跌停价
             "量比": self._safe_price(stock[49]),
             "委差": _safe_acquire_float(stock, 50),
-            "均价": _safe_acquire_float(stock, 51),
+            "avg_price": _safe_acquire_float(stock, 51), # 均价
             "市盈(动)": _safe_acquire_float(stock, 52),
             "市盈(静)": _safe_acquire_float(stock, 53),
         }
@@ -140,7 +140,25 @@ class Tencent(rtbase.rtbase):
         return self.tlineapi % stock
 
     def format_tline_response(self, rep_data):
-        return dict([[c, v['data'][c]['data']['data']] for c, v in json.loads(rep_data)])
+        result = {}
+        for c, v in rep_data:
+            data = json.loads(v)['data'][rtbase.get_fullcode(c)]['data']['data']
+            tlobjs = []
+            prev_volume = prev_amount = 0
+            for d in data:
+                time, price, volume, amount = d.split()
+                time = time[0:2] + ':' + time[2:]
+                volume = int(volume) * 100
+                amount = float(amount)
+                tlobjs.append({
+                    'time': time,
+                    'price': float(price),
+                    'volume': volume - prev_volume,
+                    'amount': amount - prev_amount,
+                })
+                prev_volume, prev_amount = volume, amount  # 更新前一个值
+            result[c] = tlobjs
+        return result
 
     def get_mkline_url(self, stock, kltype=1, length=320):
         return self.mklineapi % (stock, kltype, length)
@@ -155,7 +173,7 @@ class Tencent(rtbase.rtbase):
         result = dict()
         for c, v in rep_data:
             kdata = json.loads(v)
-            for k, kl in kdata['data'][c].items():
+            for k, kl in kdata['data'][rtbase.get_fullcode(c)].items():
                 if k.startswith('m'):
                     result[c] = [{
                         'time': f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}',
@@ -172,7 +190,7 @@ class Tencent(rtbase.rtbase):
         result = dict()
         for c, v in rep_data:
             kdata = json.loads(v)
-            for k, kl in kdata['data'][c].items():
+            for k, kl in kdata['data'][rtbase.get_fullcode(c)].items():
                 if k.startswith('qfq') or k in ['day', 'week', 'month', 'season', 'year']:
                     result[c] = [{
                         'time': x[0],

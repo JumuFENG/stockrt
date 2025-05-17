@@ -149,7 +149,13 @@ class FetchWrapper(object):
             ]
 
 
-def rtsource(source):
+def rtsource(source: str) -> Optional[Any]:
+    '''
+    获取数据源对象
+
+    Args:
+        source (str): 数据源名称
+    '''
     return FetchWrapper.get_data_source(source)
 
 
@@ -159,15 +165,40 @@ def _get_wrapper(api_name: str, func_name: str, sources: tuple) -> FetchWrapper:
 
 qwrapper = None
 def quotes(stocks: Union[str, List[str]]) -> Dict[str, Any]:
-    """获取行情数据"""
+    """获取行情数据, 根据数据源不同, 有的带有5档买卖信息数据, 有的不带. 可以获取指数的行情数据
+
+    Args:
+        stocks (Union[str, List[str]]): 股票代码或代码列表, 股票代码可以是6位纯数字代码或者带前缀的代码(sh/sz/bj + code),
+            获取指数行情数据需传入前缀，如 sh000001 为上证指数, 而000001则默认为股票即:sz000001平安银行
+
+    Returns:
+        - Dict[str, Any]: 行情数据
+    """
     wrapper = _get_wrapper('qtapi', 'quotes', ('sina', 'tencent', 'eastmoney'))
     return wrapper.fetch(stocks)
 
 def quotes5(stocks: Union[str, List[str]]) -> Dict[str, Any]:
+    '''获取带有5档买卖信息的行情数据, 根据数据源不同, 有的一次只能请求一只股票. 对于指数不建议使用该接口
+
+    Args:
+        stocks (Union[str, List[str]]): 股票代码或代码列表, 股票代码可以是6位纯数字代码或者带前缀的代码(sh/sz/bj + code)
+
+    Returns:
+        - Dict[str, Any]: 带有5档买卖信息的行情数据
+    '''
     wrapper = _get_wrapper('qt5api', 'quotes5', ('sina', 'tencent', 'eastmoney'))
     return wrapper.fetch(stocks)
 
 def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
+    '''获取分时线数据, 可以获取指数的分时数据
+
+    Args:
+        stocks (Union[str, List[str]]): 股票代码或代码列表, 股票代码可以是6位纯数字代码或者带前缀的代码(sh/sz/bj + code),
+            获取指数分时数据需传入前缀，如 sh000001 为上证指数，而000001则默认为股票即sz000001平安银行
+
+    Returns:
+        - Dict[str, Any]: 分时线数据
+    '''
     wrapper = _get_wrapper('tlineapi', 'tlines', ('sina', 'tencent', 'eastmoney'))
     return wrapper.fetch(stocks)
 
@@ -179,7 +210,36 @@ def dklines(stocks: Union[str, List[str]], kltype=101, length=320) -> Dict[str, 
     wrapper = _get_wrapper('dklineapi', 'dklines', ('eastmoney', 'tencent', 'sina'))
     return wrapper.fetch(stocks, kltype=kltype, length=length)
 
-def klines(stocks: Union[str, List[str]], kltype=1, length=320) -> Dict[str, Any]:
+def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    ''' 获取K线数据, 可以获取指数的K线数据
+
+    Args:
+        stocks (Union[str, List[str]]): 股票代码或代码列表, 股票代码可以是6位纯数字代码或者带前缀的代码(sh/sz/bj + code),
+            获取指数K线数据需传入前缀, 如: sh000001 为上证指数, 而000001则默认为股票即sz000001平安银行
+        kltype (Union[int,str], optional): K线类型. Defaults to 1.
+            - 1,5,15,30,60,120,240: 对应分钟数的K线数据
+            - 101/d/day: 日K线数据
+            - 102/w/wk/week: 周K线数据
+            - 103/m/mon/month: 月K线数据
+            - 104/q/quarter: 季度K线数据
+            - 105/h/hy/hyear: 半年K线数据
+            - 106/y/yr/year: 年K线数据
+        length (int, optional): K线数据长度. Defaults to 320.
+    '''
+    validkls = {
+        '1': 1, '5': 5, '15': 15, '30': 30, '60': 60, '120': 120, '240': 240,
+        'd': 101, 'w': 102, 'm': 103, 'q': 104, 'h': 105, 'y': 106,
+        'wk': 102, 'mon': 103, 'hy': 105, 'yr': 106, 'day': 101, 'week': 102,
+        'month': 103, 'quarter': 104, 'halfyear': 105, 'year': 106
+        }
+    if isinstance(kltype, str):
+        if kltype in validkls:
+            kltype = validkls[kltype]
+        elif kltype.isdigit():
+            kltype = int(kltype)
+    if not isinstance(kltype, int):
+        raise ValueError(f"Invalid kltype: {kltype}")
+
     if kltype in [101, 102, 103, 104, 105, 106]:
         return dklines(stocks, kltype=kltype, length=length)
     return mklines(stocks, kltype=kltype, length=length)
