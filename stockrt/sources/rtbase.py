@@ -5,7 +5,7 @@ import logging
 import requests
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Any
+from typing import Callable, Any, Union
 
 
 _DEFAULT_LOGGER = None
@@ -21,30 +21,6 @@ def get_default_logger():
         set_default_logger(logger)
     return _DEFAULT_LOGGER
 
-def get_fullcode(stock_code):
-    """判断股票ID对应的证券市场
-    匹配规则
-    ["4", "8", "92"] 为 bj
-    ['5', '6', '7', '9', '110', '113', '118', '132', '204'] 为 sh
-    其余为 sz
-
-    :param stock_code str: 股票代码, 若以 'sz', 'sh', 'bj' 开头直接返回对应类型，否则使用内置规则判断
-
-    :return str: 以 'sz', 'sh', 'bj' 开头的股票代码
-    """
-    assert isinstance(stock_code, str), "stock code need str type"
-
-    if stock_code.startswith(("sh", "sz", "zz", "bj")):
-        return stock_code
-
-    bj_head = ("4", "8", "92")
-    sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
-    if stock_code.startswith(bj_head):
-        return f"bj{stock_code}"
-    elif stock_code.startswith(sh_head):
-        return f"sh{stock_code}"
-    return f"sz{stock_code}"
-
 class rtbase(abc.ABC):
     # 每次请求的最大股票数
     quote_max_num = 800
@@ -55,7 +31,49 @@ class rtbase(abc.ABC):
     @property
     def session(self):
         return requests.session()
-    
+
+    @staticmethod
+    def get_fullcode(stock_code):
+        """判断股票ID对应的证券市场
+        匹配规则
+        ["4", "8", "92"] 为 bj
+        ['5', '6', '7', '9', '110', '113', '118', '132', '204'] 为 sh
+        其余为 sz
+
+        :param stock_code str: 股票代码, 若以 'sz', 'sh', 'bj' 开头直接返回对应类型，否则使用内置规则判断
+
+        :return str: 以 'sz', 'sh', 'bj' 开头的股票代码
+        """
+        assert isinstance(stock_code, str), "stock code need str type"
+
+        if stock_code.startswith(("sh", "sz", "zz", "bj")):
+            return stock_code
+
+        bj_head = ("4", "8", "92")
+        sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
+        if stock_code.startswith(bj_head):
+            return f"bj{stock_code}"
+        elif stock_code.startswith(sh_head):
+            return f"sh{stock_code}"
+        return f"sz{stock_code}"
+
+    @staticmethod
+    def to_int_kltype(kltype: Union[int, str]):
+        validkls = {
+            '1': 1, '5': 5, '15': 15, '30': 30, '60': 60, '120': 120, '240': 240,
+            'd': 101, 'w': 102, 'm': 103, 'q': 104, 'h': 105, 'y': 106,
+            'wk': 102, 'mon': 103, 'hy': 105, 'yr': 106, 'day': 101, 'week': 102,
+            'month': 103, 'quarter': 104, 'halfyear': 105, 'year': 106
+            }
+        if isinstance(kltype, str):
+            if kltype in validkls:
+                kltype = validkls[kltype]
+            elif kltype.isdigit():
+                kltype = int(kltype)
+        if not isinstance(kltype, int):
+            raise ValueError(f'invalid kltype: {kltype}')
+        return kltype
+
     @property
     @abc.abstractmethod
     def qtapi(self):
@@ -107,7 +125,10 @@ class rtbase(abc.ABC):
             stocks = [stocks]
         return [stocks[i:i + self.quote_max_num] for i in range(0, len(stocks), self.quote_max_num)]
 
-    def _fetch_concurrently(self, stocks, url_func: Callable, format_func: Callable, **url_kwargs):
+    def _fetch_concurrently(
+        self, stocks, url_func: Callable, format_func: Callable,
+        url_kwargs: Optional[dict] = {}, fmt_kwargs: Optional[dict] = {}
+    ):
         """并发获取数据的通用方法"""
         if not isinstance(stocks, (list, tuple)):
             stocks = [stocks]
@@ -116,7 +137,7 @@ class rtbase(abc.ABC):
 
         def fetch_single(stock):
             try:
-                fcode = get_fullcode(stock) if isinstance(stock, str) else [get_fullcode(s) for s in stock]
+                fcode = self.get_fullcode(stock) if isinstance(stock, str) else [self.get_fullcode(s) for s in stock]
                 url = url_func(fcode, **url_kwargs)
                 data = self.session.get(url, headers=self._get_headers())
                 if data and data.text:
@@ -132,7 +153,7 @@ class rtbase(abc.ABC):
                 if data is not None:
                     results.append(data)
 
-        return format_func(results)
+        return format_func(results, **fmt_kwargs)
 
     @staticmethod
     def _safe_price(s: str) -> Optional[float]:
@@ -147,10 +168,7 @@ class rtbase(abc.ABC):
     def format_tline_response(self, rep_data):
         return dict(rep_data)
 
-    def format_mkline_response(self, rep_data):
-        return dict(rep_data)
-
-    def format_dkline_response(self, rep_data):
+    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         return dict(rep_data)
 
     def quotes(self, stocks):
@@ -165,13 +183,13 @@ class rtbase(abc.ABC):
         '''
         return self._fetch_concurrently(stocks, self.get_tline_url, self.format_tline_response)
 
-    def mklines(self, stocks, kltype, length=320):
+    def mklines(self, stocks, kltype, length=320, withqt=False):
         '''
         分钟K线数据
         '''
-        return self._fetch_concurrently(stocks, self.get_mkline_url, self.format_mkline_response, kltype=kltype, length=length)
+        return self._fetch_concurrently(stocks, self.get_mkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': True, 'withqt': withqt})
 
-    def dklines(self, stocks, kltype=101, length=320):
+    def dklines(self, stocks, kltype=101, length=320, withqt=False):
         ''' 日K线或更大周期K线数据
         '''
-        return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_dkline_response, kltype=kltype, length=length)
+        return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': False, 'withqt': withqt})

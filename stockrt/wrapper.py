@@ -2,11 +2,14 @@
 from typing import List, Dict, Any, Optional, Union
 from functools import lru_cache
 
-from .sources.rtbase import get_default_logger
+from .sources.rtbase import get_default_logger, rtbase
 from .sources.sina import Sina
 from .sources.tencent import Tencent
 from .sources.eastmoney import EastMoney
 
+
+def get_fullcode(code):
+    return rtbase.get_fullcode(code)
 
 class FetchWrapper(object):
     def __init__(
@@ -202,13 +205,15 @@ def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     wrapper = _get_wrapper('tlineapi', 'tlines', ('sina', 'tencent', 'eastmoney'))
     return wrapper.fetch(stocks)
 
-def mklines(stocks: Union[str, List[str]], kltype=1, length=320) -> Dict[str, Any]:
-    wrapper = _get_wrapper('mklineapi', 'mklines', ('eastmoney', 'sina', 'tencent'))
-    return wrapper.fetch(stocks, kltype=kltype, length=length)
+def mklines(stocks: Union[str, List[str]], kltype=1, length=320, withqt=False) -> Dict[str, Any]:
+    sources = ('tencent',) if withqt else ('eastmoney', 'sina', 'tencent')
+    wrapper = _get_wrapper('mklineapi', 'mklines', sources)
+    return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
 
-def dklines(stocks: Union[str, List[str]], kltype=101, length=320) -> Dict[str, Any]:
-    wrapper = _get_wrapper('dklineapi', 'dklines', ('eastmoney', 'tencent', 'sina'))
-    return wrapper.fetch(stocks, kltype=kltype, length=length)
+def dklines(stocks: Union[str, List[str]], kltype=101, length=320, withqt=False) -> Dict[str, Any]:
+    sources = ('tencent',) if withqt else ('eastmoney', 'tencent', 'sina')
+    wrapper = _get_wrapper('dklineapi', 'dklines', sources)
+    return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
 
 def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
     ''' 获取K线数据, 可以获取指数的K线数据
@@ -225,22 +230,23 @@ def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) 
             - 105/h/hy/hyear: 半年K线数据
             - 106/y/yr/year: 年K线数据
         length (int, optional): K线数据长度. Defaults to 320.
-    '''
-    validkls = {
-        '1': 1, '5': 5, '15': 15, '30': 30, '60': 60, '120': 120, '240': 240,
-        'd': 101, 'w': 102, 'm': 103, 'q': 104, 'h': 105, 'y': 106,
-        'wk': 102, 'mon': 103, 'hy': 105, 'yr': 106, 'day': 101, 'week': 102,
-        'month': 103, 'quarter': 104, 'halfyear': 105, 'year': 106
-        }
-    if isinstance(kltype, str):
-        if kltype in validkls:
-            kltype = validkls[kltype]
-        elif kltype.isdigit():
-            kltype = int(kltype)
-    if not isinstance(kltype, int):
-        raise ValueError(f"Invalid kltype: {kltype}")
 
+    Returns:
+        - Dict[str, Any]: {code1: [], code2: [] ...}
+    '''
+    kltype = rtbase.to_int_kltype(kltype)
     if kltype in [101, 102, 103, 104, 105, 106]:
         return dklines(stocks, kltype=kltype, length=length)
     return mklines(stocks, kltype=kltype, length=length)
 
+def qklines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    ''' 获取带有行情信息的K线数据, 有的数据源获取K线数据时会同时返回行情数据, 如果没有同时返回行情数据，
+    即使调用该接口也不会包含行情数据, 参数与klines一样, 返回值格式有区别
+
+    Returns:
+        - Dict[str, Any]: {code1: {'klines': [], 'qt': []}, code2: {'klines': [], 'qt': []} ...}
+    '''
+    kltype = rtbase.to_int_kltype(kltype)
+    if kltype in [101, 102, 103, 104, 105, 106]:
+        return dklines(stocks, kltype=kltype, length=length, withqt=True)
+    return mklines(stocks, kltype=kltype, length=length, withqt=True)

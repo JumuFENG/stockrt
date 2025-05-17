@@ -110,8 +110,8 @@ class Tencent(rtbase.rtbase):
             # "high_2": float(stock[41]),  # 意义不明
             # "low_2": float(stock[42]),  # 意义不明
             "振幅": float(stock[43]),
-            "cmc": self._safe_price(stock[44]), # 流通市值
-            "mc": self._safe_price(stock[45]), # 总市值
+            "cmc": self._safe_price(stock[44]) * 1e8, # 流通市值
+            "mc": self._safe_price(stock[45]) * 1e8, # 总市值
             "PB": float(stock[46]),
             "top_price": float(stock[47]), # 涨停价
             "bottom_price": float(stock[48]), # 跌停价
@@ -142,7 +142,7 @@ class Tencent(rtbase.rtbase):
     def format_tline_response(self, rep_data):
         result = {}
         for c, v in rep_data:
-            data = json.loads(v)['data'][rtbase.get_fullcode(c)]['data']['data']
+            data = json.loads(v)['data'][self.get_fullcode(c)]['data']['data']
             tlobjs = []
             prev_volume = prev_amount = 0
             for d in data:
@@ -169,37 +169,33 @@ class Tencent(rtbase.rtbase):
         kltype = {101: 'day', 102: 'week', 103: 'month', 104: 'season', 106: 'year'}[kltype]
         return self.dklineapi % (stock, kltype, length)
 
-    def format_mkline_response(self, rep_data):
-        result = dict()
+    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
+        result = {}
         for c, v in rep_data:
             kdata = json.loads(v)
-            for k, kl in kdata['data'][rtbase.get_fullcode(c)].items():
-                if k.startswith('m'):
-                    result[c] = [{
-                        'time': f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}',
-                        'open': float(x[1]),
-                        'close': float(x[2]),
-                        'high': float(x[3]),
-                        'low': float(x[4]),
-                        'volume': int(float(x[5]) * 100)
-                    } for x in kl]
-                    break
-        return result
+            fcode = self.get_fullcode(c)
+            klines = []
 
-    def format_dkline_response(self, rep_data):
-        result = dict()
-        for c, v in rep_data:
-            kdata = json.loads(v)
-            for k, kl in kdata['data'][rtbase.get_fullcode(c)].items():
-                if k.startswith('qfq') or k in ['day', 'week', 'month', 'season', 'year']:
-                    result[c] = [{
-                        'time': x[0],
-                        'open': float(x[1]),
-                        'close': float(x[2]),
-                        'high': float(x[3]),
-                        'low': float(x[4]),
-                        'volume': int(float(x[5]) * 100)
-                    } for x in kl]
-                    break
+            # 根据数据类型选择不同的键匹配规则
+            key_pattern = lambda k: k.startswith('m') if is_minute else (k.startswith('qfq') or k in ['day', 'week', 'month', 'season', 'year'])
+
+            # 查找匹配的数据键
+            matched_key = next((k for k in kdata['data'][fcode] if key_pattern(k)), None)
+            if matched_key:
+                kl = kdata['data'][fcode][matched_key]
+                klines = [{
+                    'time': f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}' if is_minute else x[0],
+                    'open': float(x[1]),
+                    'close': float(x[2]),
+                    'high': float(x[3]),
+                    'low': float(x[4]),
+                    'volume': int(float(x[5]) * 100)
+                } for x in kl]
+
+            result[c] = {
+                'klines': klines,
+                'qt': self.parse_quote(kdata['data'][fcode]['qt'][fcode]) if withqt else None
+            } if withqt else klines
+
         return result
 

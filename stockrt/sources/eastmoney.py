@@ -66,9 +66,9 @@ class EastMoney(rtbase.rtbase):
     def get_secid(code):
         return code.replace('sh', '1.').replace('sz', '0.').replace('bj', '0.')
 
-    @staticmethod
-    def secid_to_fullcode(sec):
-        return f'sh{sec[-6:]}' if sec.startswith('1.') else rtbase.get_fullcode(sec[-6:])
+    @classmethod
+    def secid_to_fullcode(cls, sec):
+        return f'sh{sec[-6:]}' if sec.startswith('1.') else cls.get_fullcode(sec[-6:])
 
     def get_quote_url(self, stocks):
         return self.qtapi % (','.join([ self.get_secid(stock) for stock in stocks]))
@@ -170,7 +170,7 @@ class EastMoney(rtbase.rtbase):
     def get_mkline_url(self, stock, kltype='1', length=320):
         return self.mklineapi % (self.get_secid(stock), kltype, length)
 
-    def format_mkline_response(self, rep_data):
+    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         stock_dict = dict()
         for code, rsp in rep_data:
             stocks_detail = json.loads(rsp)
@@ -196,7 +196,4 @@ class EastMoney(rtbase.rtbase):
 
     def get_dkline_url(self, stock, kltype='101', length=320):
         return self.dklineapi % (self.get_secid(stock), kltype, length)
-
-    def format_dkline_response(self, rep_data):
-        return self.format_mkline_response(rep_data)
 

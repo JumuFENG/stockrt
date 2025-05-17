@@ -131,7 +131,7 @@ class Sina(rtbase.rtbase):
     def get_mkline_url(self, stock, kltype='1', length=320):
         return self.mklineapi % (stock, kltype, length)
 
-    def format_mkline_response(self, rep_data):
+    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         result = {}
         kpattern = r'x\((\[.*?\])\);'
         for c, kltxt in rep_data:
@@ -158,5 +158,3 @@ class Sina(rtbase.rtbase):
         assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
         return self.mklineapi % (stock, klt2scale[kltype], length)
 
-    def format_dkline_response(self, rep_data):
-        return self.format_mkline_response(rep_data)
