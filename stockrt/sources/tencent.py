@@ -98,7 +98,7 @@ class Tencent(rtbase.rtbase):
             # "date": stock[30][0:10],
             # "time": stock[30][10:], # "datetime": datetime.strptime(stock[30], "%Y%m%d%H%M%S"),
             "change_px": float(stock[31]),
-            "change": float(stock[32]),
+            "change": float(stock[32]) / 100,
             "high": float(stock[33]),
             "low": float(stock[34]),
             # "价格/成交量(手)/成交额": stock[35],

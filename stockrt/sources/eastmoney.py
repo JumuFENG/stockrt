@@ -82,8 +82,7 @@ class EastMoney(rtbase.rtbase):
                 code = fcode if fcode in codes else stock['f12'] if stock['f12'] in codes else fcode
                 stock_dict[code] = {
                     'name': stock['f14'],
-                    'close': self._safe_price(stock['f2']),
-                    'last_px': self._safe_price(stock['f2']),
+                    'price': self._safe_price(stock['f2']),
                     'change': self._safe_price(stock['f3']) / 100, # 涨跌幅
                     'change_px': self._safe_price(stock['f4']), # 涨跌额
                     'volume': self._safe_price(stock['f5']) * 100,
@@ -180,10 +179,10 @@ class EastMoney(rtbase.rtbase):
                 kdata = kline.split(',')
                 klarr.append({
                     'time': kdata[0],
-                    'open': kdata[1],
-                    'close': kdata[2],
-                    'high': kdata[3],
-                    'low': kdata[4],
+                    'open': self._safe_price(kdata[1]),
+                    'close': self._safe_price(kdata[2]),
+                    'high': self._safe_price(kdata[3]),
+                    'low': self._safe_price(kdata[4]),
                     'volume': int(kdata[5]) * 100,
                     'amount': float(kdata[6]),
                     'amplitude': self._safe_price(kdata[7])/100,

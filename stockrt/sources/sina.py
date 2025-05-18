@@ -84,8 +84,8 @@ class Sina(rtbase.rtbase):
                 low=float(stock[6]),
                 buy=float(stock[7]),
                 sell=float(stock[8]),
-                turnover=int(stock[9]),
-                volume=float(stock[10]),
+                volume=int(stock[9]) if int(stock[9]) * float(stock[6]) < float(stock[10]) < int(stock[9]) * float(stock[5]) else int(stock[9]) * 100,
+                amount=float(stock[10]),
                 change=(float(stock[4]) - float(stock[3])) / float(stock[3]),
                 change_px=float(stock[4]) - float(stock[3]),
                 bid1_volume=int(stock[11]),
@@ -141,7 +141,7 @@ class Sina(rtbase.rtbase):
                 karr = []
                 for x in json.loads(m.group(1)):
                     kldetail = {
-                        'time': x['day'],
+                        'time': x['day'][:-3] if is_minute and len(x['day']) > 16 else x['day'],
                         'open': float(x['open']),
                         'close': float(x['close']),
                         'high': float(x['high']),
