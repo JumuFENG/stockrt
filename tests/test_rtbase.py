@@ -27,9 +27,24 @@ class TestGetFullcodeFunction(unittest.TestCase):
 
     def test_stock_code_with_valid_bj_head(self):
         self.assertEqual(rtbase.get_fullcode("412345"), "bj412345")
+        self.assertEqual(rtbase.get_fullcode("830946"), "bj830946")
+        self.assertEqual(rtbase.get_fullcode("870436"), "bj870436")
+        self.assertEqual(rtbase.get_fullcode("920128"), "bj920128")
+        self.assertEqual(rtbase.get_fullcode("430017"), "bj430017")
+
 
     def test_stock_code_with_valid_sh_head(self):
         self.assertEqual(rtbase.get_fullcode("512345"), "sh512345")
+        self.assertEqual(rtbase.get_fullcode("688755"), "sh688755")
+        self.assertEqual(rtbase.get_fullcode("600610"), "sh600610")
+        self.assertEqual(rtbase.get_fullcode("518880"), "sh518880")
+        self.assertEqual(rtbase.get_fullcode("513520"), "sh513520")
+
+    def test_stock_code_with_valid_sz_head(self):
+        self.assertEqual(rtbase.get_fullcode("000001"), "sz000001")
+        self.assertEqual(rtbase.get_fullcode("300002"), "sz300002")
+        self.assertEqual(rtbase.get_fullcode("161129"), "sz161129")
+        self.assertEqual(rtbase.get_fullcode("159915"), "sz159915")
 
     def test_stock_code_with_invalid_head(self):
         self.assertEqual(rtbase.get_fullcode("012345"), "sz012345")

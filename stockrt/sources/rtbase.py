@@ -5,7 +5,7 @@ import logging
 import requests
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Any, Union
+from typing import Callable, Any, Union, List, Dict
 
 
 _DEFAULT_LOGGER = None
@@ -198,3 +198,15 @@ class rtbase(abc.ABC):
         ''' 日K线或更大周期K线数据
         '''
         return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': False, 'withqt': withqt})
+
+    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+        kltype = self.to_int_kltype(kltype)
+        if kltype in [101, 102, 103, 104, 105, 106]:
+            return self.dklines(stocks, kltype=kltype, length=length)
+        return self.mklines(stocks, kltype=kltype, length=length)
+
+    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+        kltype = self.to_int_kltype(kltype)
+        if kltype in [101, 102, 103, 104, 105, 106]:
+            return self.dklines(stocks, kltype=kltype, length=length, withqt=True)
+        return self.mklines(stocks, kltype=kltype, length=length, withqt=True)
