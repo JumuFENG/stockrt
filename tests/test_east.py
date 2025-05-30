@@ -62,6 +62,7 @@ class TestEmFunctions(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    suite = unittest.TestSuite()
-    suite.addTest(TestEmFunctions('test_list_of_stock_codes_dklines'))
-    unittest.TextTestRunner().run(suite)
+    # suite = unittest.TestSuite()
+    # suite.addTest(TestEmFunctions('test_list_of_stock_codes_dklines'))
+    # unittest.TextTestRunner().run(suite)
+    unittest.main()

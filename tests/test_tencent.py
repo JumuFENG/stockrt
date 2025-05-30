@@ -57,9 +57,12 @@ class TestTencentFunctions(unittest.TestCase):
 
     def test_list_of_stock_codes_qklines(self):
         stock_codes = ['000001', 'sh000001']
-        result = self.source.mklines(stock_codes, 101, 10, True)
+        result = self.source.dklines(stock_codes, 101, 10, True)
         self.assertIsInstance(result, dict)
 
 
 if __name__ == '__main__':
+    # suite = unittest.TestSuite()
+    # suite.addTest(TestTencentFunctions('test_list_of_stock_codes_qklines'))
+    # unittest.TextTestRunner().run(suite)
     unittest.main()

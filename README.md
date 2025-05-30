@@ -55,3 +55,7 @@ quotes = asrt.quotes(['600610', 'sz003003'])
 
 ### 贡献
 欢迎对本项目进行贡献！欢迎提交 PR。
+
+
+### 感谢
+本项目新浪/腾讯行情参考了[easyquotation](https://github.com/shidenggui/easyquotation), 

@@ -123,6 +123,7 @@ class rtbase(abc.ABC):
         return {
             "Accept-Encoding": "gzip, deflate, sdch",
             "User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0',
+            'Connection': 'keep-alive',
         }
 
     def _stock_groups(self, stocks):
@@ -141,14 +142,14 @@ class rtbase(abc.ABC):
         results = []
 
         def fetch_single(stock):
+            fcode = self.get_fullcode(stock) if isinstance(stock, str) else [self.get_fullcode(s) for s in stock]
+            url, headers = url_func(fcode, **url_kwargs)
             try:
-                fcode = self.get_fullcode(stock) if isinstance(stock, str) else [self.get_fullcode(s) for s in stock]
-                url = url_func(fcode, **url_kwargs)
-                data = self.session.get(url, headers=self._get_headers())
+                data = self.session.get(url, headers=headers)
                 if data and data.text:
                     return [stock, data.text]
             except Exception as e:
-                self.logger.error(f"处理股票数据出错: {stock} {str(e)}")
+                self.logger.error(f"fetch error: {url} {str(e)}")
             return None
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -192,11 +193,13 @@ class rtbase(abc.ABC):
         '''
         分钟K线数据
         '''
+        kltype = self.to_int_kltype(kltype)
         return self._fetch_concurrently(stocks, self.get_mkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': True, 'withqt': withqt})
 
     def dklines(self, stocks, kltype=101, length=320, withqt=False):
         ''' 日K线或更大周期K线数据
         '''
+        kltype = self.to_int_kltype(kltype)
         return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': False, 'withqt': withqt})
 
     def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:

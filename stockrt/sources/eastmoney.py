@@ -54,7 +54,7 @@ class EastMoney(rtbase.rtbase):
     def mklineapi(self):
         return (
             'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s&klt=%d&fqt=1&lmt=%d'
-            '&end=20500000&iscca=1&fields1=f1,f2,f3,f4,f5,f6,f7,f8'
+            '&end=20500000&fields1=f1,f2,f3,f4,f5,f6,f7,f8'
             '&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64'
         )
 
@@ -71,7 +71,13 @@ class EastMoney(rtbase.rtbase):
         return f'sh{sec[-6:]}' if sec.startswith('1.') else cls.get_fullcode(sec[-6:])
 
     def get_quote_url(self, stocks):
-        return self.qtapi % (','.join([ self.get_secid(stock) for stock in stocks]))
+        url = self.qtapi % (','.join([ self.get_secid(stock) for stock in stocks]))
+        headers = {
+            **self._get_headers(),
+            'Referer': 'https://quote.eastmoney.com/',
+            'Host': 'push2.eastmoney.com',
+        }
+        return url, headers
 
     def format_quote_response(self, rep_data):
         stock_dict = dict()
@@ -97,7 +103,13 @@ class EastMoney(rtbase.rtbase):
         return stock_dict
 
     def get_quote5_url(self, stock):
-        return self.qt5api % stock[-6:]
+        url = self.qt5api % stock[-6:]
+        headers = {
+            **self._get_headers(),
+            'Referer': 'https://quote.eastmoney.com/',
+            'Host': 'hsmarketwg.eastmoney.com',
+        }
+        return url, headers
 
     def quotes5(self, stocks):
         return self._fetch_concurrently(stocks, self.get_quote5_url, self.format_quote5_response)
@@ -147,7 +159,13 @@ class EastMoney(rtbase.rtbase):
         return stock_dict
 
     def get_tline_url(self, stock):
-        return self.tlineapi % self.get_secid(stock)
+        url = self.tlineapi % self.get_secid(stock)
+        headers = {
+            **self._get_headers(),
+            'Referer': f'https://quote.eastmoney.com/{self.secid_to_fullcode(stock)}.html',
+            'Host': 'push2his.eastmoney.com',
+        }
+        return url, headers
 
     def format_tline_response(self, rep_data):
         stock_dict = {}
@@ -167,7 +185,13 @@ class EastMoney(rtbase.rtbase):
         return stock_dict
 
     def get_mkline_url(self, stock, kltype='1', length=320):
-        return self.mklineapi % (self.get_secid(stock), kltype, length)
+        url = self.mklineapi % (self.get_secid(stock), kltype, length)
+        headers = {
+            **self._get_headers(),
+            'Referer': f'https://quote.eastmoney.com/{self.secid_to_fullcode(stock)}.html',
+            'Host': 'push2his.eastmoney.com',
+        }
+        return url, headers
 
     def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         stock_dict = dict()
@@ -194,5 +218,5 @@ class EastMoney(rtbase.rtbase):
         return stock_dict
 
     def get_dkline_url(self, stock, kltype='101', length=320):
-        return self.dklineapi % (self.get_secid(stock), kltype, length)
+        return self.get_mkline_url(stock, kltype, length)
 

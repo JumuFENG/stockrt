@@ -48,7 +48,7 @@ class Tencent(rtbase.rtbase):
         }
 
     def get_quote_url(self, stocks):
-        return self.qtapi % (','.join(stocks))
+        return self.qtapi % (','.join(stocks)), self._get_headers()
 
     def parse_quote(self, stock):
         def _safe_acquire_float(stock: list, idx: int) -> Optional[float]:
@@ -137,7 +137,7 @@ class Tencent(rtbase.rtbase):
         return stock_dict
     
     def get_tline_url(self, stock):
-        return self.tlineapi % stock
+        return self.tlineapi % stock, self._get_headers()
 
     def format_tline_response(self, rep_data):
         result = {}
@@ -161,13 +161,13 @@ class Tencent(rtbase.rtbase):
         return result
 
     def get_mkline_url(self, stock, kltype=1, length=320):
-        return self.mklineapi % (stock, kltype, length)
+        return self.mklineapi % (stock, kltype, length), self._get_headers()
 
     def get_dkline_url(self, stock, kltype=101, length=320):
         if kltype == 105:
             raise NotImplementedError('not available for half year in tencent source')
         kltype = {101: 'day', 102: 'week', 103: 'month', 104: 'season', 106: 'year'}[kltype]
-        return self.dklineapi % (stock, kltype, length)
+        return self.dklineapi % (stock, kltype, length), self._get_headers()
 
     def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         result = {}

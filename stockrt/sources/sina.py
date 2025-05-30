@@ -62,7 +62,7 @@ class Sina(rtbase.rtbase):
         }
 
     def get_quote_url(self, stocks):
-        return self.qtapi % (int(time.time() * 1000), ','.join(stocks))
+        return self.qtapi % (int(time.time() * 1000), ','.join(stocks)), self._get_headers()
 
     def format_quote_response(self, rep_data):
         stocks_detail = "".join([rsp for _, rsp in rep_data])
@@ -111,10 +111,12 @@ class Sina(rtbase.rtbase):
                 date=stock[31],
                 time=stock[32],
             )
+            if stock_dict[code]['time'] < '09:30':
+                rtbase.get_default_logger().info("stock %s price is 0, %s" % (stock_dict[code]['name'], stock))
         return stock_dict
 
     def get_tline_url(self, stock):
-        return self.tlineapi % stock
+        return self.tlineapi % stock, self._get_headers()
 
     def format_tline_response(self, rep_data):
         result = {}
@@ -130,7 +132,7 @@ class Sina(rtbase.rtbase):
         return result
 
     def get_mkline_url(self, stock, kltype='1', length=320):
-        return self.mklineapi % (stock, kltype, length)
+        return self.mklineapi % (stock, kltype, length), self._get_headers()
 
     def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         result = {}
@@ -157,5 +159,5 @@ class Sina(rtbase.rtbase):
     def get_dkline_url(self, stock, kltype=101, length=320):
         klt2scale = {101: 240, 102: 1200, 103: 7200, 106: 86400}
         assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
-        return self.mklineapi % (stock, klt2scale[kltype], length)
+        return self.mklineapi % (stock, klt2scale[kltype], length), self._get_headers()
 

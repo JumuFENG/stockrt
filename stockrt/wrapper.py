@@ -37,37 +37,34 @@ class FetchWrapper(object):
         return get_default_logger()
 
     @staticmethod
-    def _src_unified(source):
-        source = source.lower()
-        if source in ['sina']:
-            return 'sina'
-        if source in ['qq', 'tencent']:
-            return 'tencent'
-        if source in ['em', 'eastmoney']:
-            return 'eastmoney'
-        return source
+    @lru_cache(maxsize=None)
+    def _get_source(usrc: str) -> str:
+        if usrc == 'sina':
+            return Sina()
+        if usrc == 'tencent':
+            return Tencent()
+        if usrc == 'eastmoney':
+            return EastMoney()
 
-    source_objects = dict()
     @classmethod
-    def get_data_source(self, source_name: str) -> Optional[Any]:
+    def get_data_source(self, source: str) -> Optional[Any]:
         """
         Get a data source object, given a source name.
 
         :param source: str, a source name, one of 'sina', 'qq', 'tencent', 'em', 'eastmoney'
         :return: a data source object, one of Sina, Tencent, EastMoney
         """
-        usrc = self._src_unified(source_name)
-        if usrc not in self.source_objects:
-            if usrc == 'sina':
-                self.source_objects[usrc] = Sina()
-            elif usrc == 'tencent':
-                self.source_objects[usrc] = Tencent()
-            elif usrc == 'eastmoney':
-                self.source_objects[usrc] = EastMoney()
-            else:
-                raise NotImplementedError(f"not yet implemented data source: {usrc}")
+        source = source.lower()
+        if source in ['sina']:
+            source = 'sina'
+        elif source in ['qq', 'tencent']:
+            source = 'tencent'
+        elif source in ['em', 'eastmoney']:
+            source = 'eastmoney'
+        else:
+            raise NotImplementedError(f"not yet implemented data source: {source}")
 
-        return self.source_objects.get(usrc)
+        return self._get_source(source)
 
     @property
     def current_source_order(self) -> List[str]:
