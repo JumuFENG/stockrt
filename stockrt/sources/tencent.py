@@ -3,7 +3,7 @@ import re
 import time
 import json
 from typing import Optional
-from . import rtbase
+from .rtbase import requestbase
 
 """
 reference: https://stockapp.finance.qq.com/mstats/
@@ -19,7 +19,7 @@ https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var=&code=sh603444&r=0.8169
 https://web.ifzq.gtimg.cn/appstock/app/day/query?_var=&code=sh603444&r=0.8305712721067519
 """
 
-class Tencent(rtbase.rtbase):
+class Tencent(requestbase):
     quote_max_num = 60
     grep_stock_code = re.compile(r"(?<=_)\w+")
 
@@ -150,14 +150,9 @@ class Tencent(rtbase.rtbase):
                 time = time[0:2] + ':' + time[2:]
                 volume = int(volume) * 100
                 amount = float(amount)
-                tlobjs.append({
-                    'time': time,
-                    'price': float(price),
-                    'volume': volume - prev_volume,
-                    'amount': amount - prev_amount,
-                })
+                tlobjs.append([time, float(price), volume - prev_volume, amount - prev_amount])
                 prev_volume, prev_amount = volume, amount  # 更新前一个值
-            result[c] = tlobjs
+            result[c] = self.format_array_list(tlobjs, ['time', 'price', 'volume', 'amount'])
         return result
 
     def get_mkline_url(self, stock, kltype=1, length=320):
@@ -183,15 +178,11 @@ class Tencent(rtbase.rtbase):
             matched_key = next((k for k in kdata['data'][fcode] if key_pattern(k)), None)
             if matched_key:
                 kl = kdata['data'][fcode][matched_key]
-                klines = [{
-                    'time': f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}' if is_minute else x[0],
-                    'open': float(x[1]),
-                    'close': float(x[2]),
-                    'high': float(x[3]),
-                    'low': float(x[4]),
-                    'volume': int(float(x[5]) * 100)
-                } for x in kl]
-
+                klines = [[
+                    f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}' if is_minute else x[0],
+                    float(x[1]), float(x[2]), float(x[3]), float(x[4]), int(float(x[5]) * 100)
+                ] for x in kl]
+            klines = self.format_array_list(klines, ['time', 'open', 'close', 'high', 'low', 'volume'])
             result[c] = {
                 'klines': klines,
                 'qt': self.parse_quote(kdata['data'][fcode]['qt'][fcode]) if withqt else None

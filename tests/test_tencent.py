@@ -22,12 +22,12 @@ class TestTencentFunctions(unittest.TestCase):
 
     def test_single_stock_tlines(self):
         stock_codes = '000001'
-        result = self.source.quotes(stock_codes)
+        result = self.source.tlines(stock_codes)
         self.assertIsInstance(result, dict)
 
     def test_list_of_stock_codes_tlines(self):
         stock_codes = ['000001', 'sh000001']
-        result = self.source.quotes(stock_codes)
+        result = self.source.tlines(stock_codes)
         self.assertIsInstance(result, dict)
 
     def test_single_stock_mklines(self):

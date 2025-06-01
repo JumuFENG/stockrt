@@ -1,11 +1,14 @@
 # coding:utf8
-from typing import List, Dict, Any, Optional, Union
+import math
 from functools import lru_cache
+from typing import List, Dict, Any, Optional, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .sources.rtbase import get_default_logger, rtbase
 from .sources.sina import Sina
 from .sources.tencent import Tencent
 from .sources.eastmoney import EastMoney
+from .sources.pymtdx import SrcTdx
 
 
 def get_fullcode(code):
@@ -17,6 +20,7 @@ class FetchWrapper(object):
         api_name: str,
         func_name: str,
         data_sources: List[str],
+        parrallel: bool = False
     ):
         """
         数据获取包装器
@@ -24,13 +28,14 @@ class FetchWrapper(object):
         :param api_name: 数据源API属性名
         :param func_name: 要调用的方法名
         :param data_sources: 数据源优先级列表（会复制一份避免修改外部列表）
-        :param logger: 可选的日志记录器
+        :param parrallel: 是否同时使用多个数据源
         """
         self.api_name = api_name
         self.func_name = func_name
         self._original_sources = data_sources.copy()  # 保留原始顺序
         self._current_sources = data_sources.copy()   # 当前可用数据源
         self._failed_sources = set()                  # 完全失败的数据源
+        self._parrallel = parrallel
 
     @property
     def logger(self):
@@ -38,21 +43,23 @@ class FetchWrapper(object):
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def _get_source(usrc: str) -> str:
+    def _get_source(usrc: str) -> rtbase:
         if usrc == 'sina':
             return Sina()
         if usrc == 'tencent':
             return Tencent()
         if usrc == 'eastmoney':
             return EastMoney()
+        if usrc == 'tdx':
+            return SrcTdx()
 
     @classmethod
-    def get_data_source(self, source: str) -> Optional[Any]:
+    def get_data_source(self, source: str) -> rtbase:
         """
         Get a data source object, given a source name.
 
-        :param source: str, a source name, one of 'sina', 'qq', 'tencent', 'em', 'eastmoney'
-        :return: a data source object, one of Sina, Tencent, EastMoney
+        :param source: str, a source name, one of 'sina', 'qq', 'tencent', 'em', 'eastmoney', 'tdx'
+        :return: a data source object, one of Sina, Tencent, EastMoney, SrcTdx
         """
         source = source.lower()
         if source in ['sina']:
@@ -61,6 +68,8 @@ class FetchWrapper(object):
             source = 'tencent'
         elif source in ['em', 'eastmoney']:
             source = 'eastmoney'
+        elif source in ['tdx', 'pytdx']:
+            source = 'tdx'
         else:
             raise NotImplementedError(f"not yet implemented data source: {source}")
 
@@ -90,6 +99,11 @@ class FetchWrapper(object):
                 return {}
 
         stocks_list = [stocks] if isinstance(stocks, str) else list(stocks)
+
+        # Handle parallel fetching when enabled and stocks list is large
+        if self._parrallel and len(stocks_list) > 100 and len(self._current_sources) > 1:
+            return self._parallel_fetch(stocks_list, *args, **kwargs)
+
         result = {}
         remaining_sources = self._current_sources.copy()
         while remaining_sources:
@@ -126,6 +140,81 @@ class FetchWrapper(object):
 
         return result
 
+    def _parallel_fetch(self, stocks_list: List[str], *args, **kwargs) -> Dict[str, Any]:
+        """
+        Parallel fetching implementation that distributes stocks across available data sources.
+        
+        :param stocks_list: List of stock codes to fetch
+        :return: Combined results from all data sources
+        """
+        result = {}
+        num_sources = len(self._current_sources)
+        chunk_size = math.ceil(len(stocks_list) / num_sources)
+
+        # Split stocks into chunks for each data source
+        chunks = [
+            stocks_list[i * chunk_size:(i + 1) * chunk_size]
+            for i in range(num_sources)
+        ]
+
+        with ThreadPoolExecutor(max_workers=num_sources) as executor:
+            futures = {}
+            for i, source in enumerate(self._current_sources):
+                if i >= len(chunks) or not chunks[i]:
+                    continue
+
+                futures[executor.submit(
+                    self._fetch_from_source,
+                    source,
+                    chunks[i],
+                    *args,
+                    **kwargs
+                )] = source
+
+            for future in as_completed(futures):
+                source = futures[future]
+                try:
+                    data = future.result()
+                    if data:
+                        result.update(data)
+                except Exception as e:
+                    self.logger.warning(
+                        "Parallel data source %s encountered an exception: %s", 
+                        source, str(e)
+                    )
+                    self._handle_empty_result(source)
+
+        return result
+
+    def _fetch_from_source(self, source: str, stocks: List[str], *args, **kwargs) -> Dict[str, Any]:
+        """
+        Helper method to fetch data from a single source, used in parallel fetching.
+        
+        :param source: Data source name
+        :param stocks: List of stock codes to fetch from this source
+        :return: Data dictionary
+        """
+        try:
+            data_source = self.get_data_source(source)
+            if not data_source or not hasattr(data_source, self.api_name):
+                self._handle_unavailable_source(source)
+                return {}
+
+            fetch_func = getattr(data_source, self.func_name)
+            data = fetch_func(stocks, *args, **kwargs)
+            if not data:
+                self._handle_empty_result(source)
+                return {}
+
+            return data
+        except Exception as e:
+            self.logger.warning(
+                "Data source %s encountered an exception in parallel fetch: %s", 
+                source, str(e)
+            )
+            self._handle_empty_result(source)
+            return {}
+
     def _handle_unavailable_source(self, source: str):
         """处理不可用数据源"""
         if source in self._current_sources:
@@ -137,7 +226,8 @@ class FetchWrapper(object):
         """处理空结果数据源"""
         if source in self._current_sources:
             self._current_sources.remove(source)
-            self._current_sources.append(source)  # 移到末尾
+            if not self._parrallel:
+                self._current_sources.append(source)  # 移到末尾
             self.logger.debug(f"数据源 {source} 返回空结果，已移到备用位置")
 
     def _try_reset_sources(self):
@@ -150,7 +240,7 @@ class FetchWrapper(object):
             ]
 
 
-def rtsource(source: str) -> Optional[Any]:
+def rtsource(source: str) -> rtbase:
     '''
     获取数据源对象
 
@@ -161,10 +251,10 @@ def rtsource(source: str) -> Optional[Any]:
 
 
 @lru_cache(maxsize=None)
-def _get_wrapper(api_name: str, func_name: str, sources: tuple) -> FetchWrapper:
-    return FetchWrapper(api_name, func_name, list(sources))
+def _get_wrapper(api_name: str, func_name: str, sources: tuple, parrallel: bool = False) -> FetchWrapper:
+    return FetchWrapper(api_name, func_name, list(sources), parrallel=parrallel)
 
-qwrapper = None
+
 def quotes(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     """获取行情数据, 根据数据源不同, 有的带有5档买卖信息数据, 有的不带. 可以获取指数的行情数据
 
@@ -204,13 +294,13 @@ def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     return wrapper.fetch(stocks)
 
 def mklines(stocks: Union[str, List[str]], kltype=1, length=320, withqt=False) -> Dict[str, Any]:
-    sources = ('tencent',) if withqt else ('eastmoney', 'sina', 'tencent')
-    wrapper = _get_wrapper('mklineapi', 'mklines', sources)
+    sources = ('tencent',) if withqt else ('eastmoney', 'tdx', 'sina', 'tencent')
+    wrapper = _get_wrapper('mklineapi', 'mklines', sources, parrallel=True)
     return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
 
 def dklines(stocks: Union[str, List[str]], kltype=101, length=320, withqt=False) -> Dict[str, Any]:
-    sources = ('tencent',) if withqt else ('eastmoney', 'tencent', 'sina')
-    wrapper = _get_wrapper('dklineapi', 'dklines', sources)
+    sources = ('tencent',) if withqt else ('eastmoney', 'tdx', 'tencent', 'sina')
+    wrapper = _get_wrapper('dklineapi', 'dklines', sources, parrallel=True)
     return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
 
 def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:

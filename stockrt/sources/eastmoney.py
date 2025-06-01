@@ -2,7 +2,7 @@
 import re
 import time
 import json
-from . import rtbase
+from .rtbase import requestbase
 
 '''
 quotes:
@@ -28,7 +28,7 @@ https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.601136&klt=101&fqt
 '''
 
 
-class EastMoney(rtbase.rtbase):
+class EastMoney(requestbase):
     quote_max_num = 60
 
     @property
@@ -171,17 +171,12 @@ class EastMoney(rtbase.rtbase):
         stock_dict = {}
         for code, rsp in rep_data:
             stocks_detail = json.loads(rsp)
-            stock_dict[code] = [
-                {
-                    'time': time_str.split()[1],
-                    'price': float(price),
-                    'volume': int(volume) * 100,
-                    'amount': float(amount),
-                    'avg_price': float(avg_price),
-                }
+            stock_dict[code] = self.format_array_list([[
+                    time_str.split()[1], float(price), int(volume) * 100, float(amount), float(avg_price),
+                ]
                 for kl in stocks_detail['data']['trends']
                 for time_str, _, price, *_, volume, amount, avg_price in [kl.split(',')]
-            ]
+            ], ['time', 'price', 'volume', 'amount', 'avg_price'])
         return stock_dict
 
     def get_mkline_url(self, stock, kltype='1', length=320):
@@ -195,25 +190,26 @@ class EastMoney(rtbase.rtbase):
 
     def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         stock_dict = dict()
+        kcols = ['time', 'open', 'close', 'high', 'low', 'volume', 'amount', 'amplitude', 'change', 'change_px', 'turnover']
         for code, rsp in rep_data:
             stocks_detail = json.loads(rsp)
             klines = stocks_detail['data']['klines']
             klarr = []
             for kline in klines:
                 kdata = kline.split(',')
-                klarr.append({
-                    'time': kdata[0],
-                    'open': self._safe_price(kdata[1]),
-                    'close': self._safe_price(kdata[2]),
-                    'high': self._safe_price(kdata[3]),
-                    'low': self._safe_price(kdata[4]),
-                    'volume': int(kdata[5]) * 100,
-                    'amount': float(kdata[6]),
-                    'amplitude': self._safe_price(kdata[7])/100,
-                    'change': self._safe_price(kdata[8])/100,
-                    'change_px': self._safe_price(kdata[9]),
-                    'turnover': self._safe_price(kdata[10])/100})
-            stock_dict[code] = klarr
+                klarr.append([
+                    kdata[0],
+                    self._safe_price(kdata[1]),
+                    self._safe_price(kdata[2]),
+                    self._safe_price(kdata[3]),
+                    self._safe_price(kdata[4]),
+                    int(kdata[5]) * 100,
+                    self._safe_price(kdata[6]),
+                    self._safe_price(kdata[7])/100,
+                    self._safe_price(kdata[8])/100,
+                    self._safe_price(kdata[9]),
+                    self._safe_price(kdata[10])/100])
+            stock_dict[code] = self.format_array_list(klarr, kcols)
 
         return stock_dict
 

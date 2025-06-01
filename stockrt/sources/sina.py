@@ -2,7 +2,7 @@
 import re
 import time
 import json
-from . import rtbase
+from .rtbase import requestbase, get_default_logger
 
 """
 reference: https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
@@ -19,7 +19,7 @@ K线
 """
 
 
-class Sina(rtbase.rtbase):
+class Sina(requestbase):
     quote_max_num = 800
     grep_detail = re.compile(
         r"(\d+)=[^\s]([^\s,]+?)%s%s"
@@ -112,7 +112,7 @@ class Sina(rtbase.rtbase):
                 time=stock[32],
             )
             if stock_dict[code]['time'] < '09:30':
-                rtbase.get_default_logger().info("stock %s price is 0, %s" % (stock_dict[code]['name'], stock))
+                get_default_logger().info("stock %s price is 0, %s" % (stock_dict[code]['name'], stock))
         return stock_dict
 
     def get_tline_url(self, stock):
@@ -122,13 +122,9 @@ class Sina(rtbase.rtbase):
         result = {}
         for c, v in rep_data:
             data = json.loads(v)['result']['data']
-            result[c] = [{
-                'time': d['m'][:-3],
-                'price': float(d['p']),
-                'volume': int(d['v']),
-                'avg_price': float(d['avg_p']),
-                'amount': int(d['v']) * float(d['p']),
-            } for d in data]
+            result[c] = self.format_array_list([
+                [d['m'][:-3], float(d['p']), int(d['v']), int(d['v']) * float(d['p']), float(d['avg_p'])] for d in data],
+                ['time', 'price', 'volume', 'amount', 'avg_price'])
         return result
 
     def get_mkline_url(self, stock, kltype='1', length=320):
@@ -142,18 +138,16 @@ class Sina(rtbase.rtbase):
             if m:
                 karr = []
                 for x in json.loads(m.group(1)):
-                    kldetail = {
-                        'time': x['day'][:-3] if is_minute and len(x['day']) > 16 else x['day'],
-                        'open': float(x['open']),
-                        'close': float(x['close']),
-                        'high': float(x['high']),
-                        'low': float(x['low']),
-                        'volume': int(x['volume']),
-                    }
-                    if 'amount' in x:
-                        kldetail['amount'] = float(x['amount'])
-                    karr.append(kldetail)
-                result[c] = karr
+                    karr.append([
+                        x['day'][:-3] if is_minute and len(x['day']) > 16 else x['day'],
+                        float(x['open']),
+                        float(x['close']),
+                        float(x['high']),
+                        float(x['low']),
+                        int(x['volume']),
+                        float(x['amount']) if 'amount' in x else float(x['close']) * int(x['volume'])
+                    ])
+                result[c] = self.format_array_list(karr, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
         return result
 
     def get_dkline_url(self, stock, kltype=101, length=320):

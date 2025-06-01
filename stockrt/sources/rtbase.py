@@ -3,23 +3,58 @@
 import abc
 import logging
 import requests
+import importlib.util
+if importlib.util.find_spec("numpy"):
+    import numpy as np
+if importlib.util.find_spec("pandas"):
+    import pandas as pd
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Any, Union, List, Dict
-
+from functools import cached_property
 
 _DEFAULT_LOGGER = None
 
 def set_default_logger(logger: logging.Logger):
     global _DEFAULT_LOGGER
-    _DEFAULT_LOGGER = logger
+    if isinstance(_DEFAULT_LOGGER, logging.Logger):
+        for handler in _DEFAULT_LOGGER.handlers[:]:
+            _DEFAULT_LOGGER.removeHandler(handler)
+    else:
+        _DEFAULT_LOGGER = logger
+
+    import importlib.util
+    if importlib.util.find_spec("pytdx"):
+        from pytdx.log import log
+        for handler in log.handlers[:]:
+            log.removeHandler(handler)
+        log.propagate = True
+        log.info("set pytdx logger propagate!")
 
 def get_default_logger():
     if _DEFAULT_LOGGER is None:
-        logger = logging.getLogger(__name__ + '.null')
+        logger = logging.getLogger('rtbase')
         logger.addHandler(logging.NullHandler())
         set_default_logger(logger)
     return _DEFAULT_LOGGER
+
+_DEFAULT_ARRAY_FORMAT = 'list'
+def set_array_format(fmt:str):
+    '''
+    序列数据(tlines/klines)返回格式，默认返回纯序列，需注意各字段的含义.
+
+    :param fmt str: 'list' | 'tuple' | 'dict' = 'json' | 'pd' | 'df' | 'np'
+    '''
+    global _DEFAULT_ARRAY_FORMAT
+    _DEFAULT_ARRAY_FORMAT = fmt
+
+def get_array_format():
+    if _DEFAULT_ARRAY_FORMAT == 'np' and not importlib.util.find_spec("numpy"):
+        return 'list'
+    if _DEFAULT_ARRAY_FORMAT in ('pd', 'df') and not importlib.util.find_spec("pandas"):
+        return 'list'
+    return _DEFAULT_ARRAY_FORMAT
+
 
 class rtbase(abc.ABC):
     # 每次请求的最大股票数
@@ -27,10 +62,6 @@ class rtbase(abc.ABC):
     @property
     def logger(self):
         return get_default_logger()
-
-    @property
-    def session(self):
-        return requests.session()
 
     @staticmethod
     def get_fullcode(stock_code):
@@ -40,7 +71,7 @@ class rtbase(abc.ABC):
         ['5', '6', '7', '9', '110', '113', '118', '132', '204'] 为 sh
         其余为 sz
 
-        :param stock_code str: 股票代码, 若以 'sz', 'sh', 'bj' 开头直接返回对应类型，否则使用内置规则判断
+        :param stock_code str: 股票代码, 若以 'sz', 'sh', 'bj' 开头直接返回，否则使用内置规则判断
 
         :return str: 以 'sz', 'sh', 'bj' 开头的股票代码
         """
@@ -88,17 +119,9 @@ class rtbase(abc.ABC):
     def qt5api(self):
         return self.qtapi
 
-    @abc.abstractmethod
-    def get_quote_url(self, stocks):
-        pass
-
     @property
     @abc.abstractmethod
     def tlineapi(self):
-        pass
-
-    @abc.abstractmethod
-    def get_tline_url(self, stock):
         pass
 
     @property
@@ -106,13 +129,109 @@ class rtbase(abc.ABC):
     def mklineapi(self):
         pass
 
-    @abc.abstractmethod
-    def get_mkline_url(self, stock, kltype='1', length=320):
-        pass
-
     @property
     @abc.abstractmethod
     def dklineapi(self):
+        pass
+
+    def _stock_groups(self, stocks):
+        if not isinstance(stocks, (list, tuple)):
+            stocks = [stocks]
+        return [stocks[i:i + self.quote_max_num] for i in range(0, len(stocks), self.quote_max_num)]
+
+    @staticmethod
+    def _safe_price(s: str) -> Optional[float]:
+        try:
+            return float(s)
+        except ValueError:
+            return 0
+
+    @abc.abstractmethod
+    def quotes(self, stocks):
+        pass
+
+    @abc.abstractmethod
+    def quotes5(self, stocks):
+        pass
+
+    @abc.abstractmethod
+    def tlines(self, stocks):
+        ''' 分时数据
+        '''
+        pass
+
+    @staticmethod
+    def format_array_list(
+        tlines: list[list[]],
+        cols: Optional[list[str]] = ['time', 'price', 'volume', 'amount']
+    ) -> Union[list[dict[]], tuple[tuple[]], pd.DataFrame, np.ndarray, List[Tuple[float, ...]]]:
+        """将K线/分时数据列表转换为指定格式。
+
+        Args:
+            tlines: 输入的K线/分时数据列表，每项为 (time, price, volume, amount)。
+            cols: 字段名列表，默认 ['time', 'price', 'volume', 'amount']。
+
+        Returns:
+            根据 `get_array_format()` 返回的格式转换后的数据。
+        """
+        if not tlines:
+            return tlines  # 空数据直接返回
+
+        fmt = get_array_format()
+        supported_fmts = ['list', 'tuple', 'dict', 'json', 'pd', 'df', 'np']
+        if fmt not in supported_fmts:
+            raise ValueError(f"不支持的格式: {fmt}，可选: {supported_fmts}")
+        if len(tlines[0]) != len(cols):
+            raise ValueError(f"数据列数不匹配: 预期 {len(cols)} 列，实际 {len(tlines[0])} 列")
+
+        if fmt == 'list':
+            return tlines
+        elif fmt == 'tuple':
+            return tuple(tuple(tl) for tl in tlines)
+        elif fmt in ('dict', 'json'):
+            return [dict(zip(cols, tl)) for tl in tlines]
+        elif fmt == 'pd' or fmt == 'df':
+            return pd.DataFrame(tlines, columns=cols)
+        elif fmt == 'np':
+            return np.array(tlines)
+
+    @abc.abstractmethod
+    def mklines(self, stocks, kltype, length=320, withqt=False):
+        '''
+        分钟K线数据
+        '''
+        pass
+
+    @abc.abstractmethod
+    def dklines(self, stocks, kltype=101, length=320, withqt=False):
+        ''' 日K线或更大周期K线数据
+        '''
+        pass
+
+    @abc.abstractmethod
+    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+        pass
+
+    @abc.abstractmethod
+    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+        pass
+
+
+class requestbase(rtbase):
+    @cached_property
+    def session(self):
+        return requests.session()
+
+    @abc.abstractmethod
+    def get_quote_url(self, stocks):
+        pass
+
+    @abc.abstractmethod
+    def get_tline_url(self, stock):
+        pass
+
+    @abc.abstractmethod
+    def get_mkline_url(self, stock, kltype='1', length=320):
         pass
 
     @abc.abstractmethod
@@ -125,11 +244,6 @@ class rtbase(abc.ABC):
             "User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0',
             'Connection': 'keep-alive',
         }
-
-    def _stock_groups(self, stocks):
-        if not isinstance(stocks, (list, tuple)):
-            stocks = [stocks]
-        return [stocks[i:i + self.quote_max_num] for i in range(0, len(stocks), self.quote_max_num)]
 
     def _fetch_concurrently(
         self, stocks, url_func: Callable, format_func: Callable,
@@ -161,13 +275,6 @@ class rtbase(abc.ABC):
 
         return format_func(results, **fmt_kwargs)
 
-    @staticmethod
-    def _safe_price(s: str) -> Optional[float]:
-        try:
-            return float(s)
-        except ValueError:
-            return 0
-
     def format_quote_response(self, rep_data):
         return dict(rep_data)
 
@@ -185,20 +292,13 @@ class rtbase(abc.ABC):
         return self.quotes(stocks)
 
     def tlines(self, stocks):
-        ''' 分时数据
-        '''
         return self._fetch_concurrently(stocks, self.get_tline_url, self.format_tline_response)
 
     def mklines(self, stocks, kltype, length=320, withqt=False):
-        '''
-        分钟K线数据
-        '''
         kltype = self.to_int_kltype(kltype)
         return self._fetch_concurrently(stocks, self.get_mkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': True, 'withqt': withqt})
 
     def dklines(self, stocks, kltype=101, length=320, withqt=False):
-        ''' 日K线或更大周期K线数据
-        '''
         kltype = self.to_int_kltype(kltype)
         return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': False, 'withqt': withqt})
 
@@ -213,3 +313,42 @@ class rtbase(abc.ABC):
         if kltype in [101, 102, 103, 104, 105, 106]:
             return self.dklines(stocks, kltype=kltype, length=length, withqt=True)
         return self.mklines(stocks, kltype=kltype, length=length, withqt=True)
+
+
+class NoneSourcePy(rtbase):
+    @property
+    def qtapi(self):
+        pass
+
+    @property
+    def tlineapi(self):
+        pass
+
+    @property
+    def mklineapi(self):
+        pass
+
+    @property
+    def dklineapi(self):
+        pass
+
+    def quotes(self, stocks):
+        pass
+
+    def quotes5(self, stocks):
+        pass
+
+    def tlines(self, stocks):
+        pass
+
+    def mklines(self, stocks, kltype, length=320, withqt=False):
+        pass
+
+    def dklines(self, stocks, kltype=101, length=320, withqt=False):
+        pass
+
+    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+        pass
+
+    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+        pass
