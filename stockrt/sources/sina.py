@@ -2,7 +2,7 @@
 import re
 import time
 import json
-from .rtbase import requestbase, get_default_logger
+from .rtbase import requestbase
 
 """
 reference: https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
@@ -75,19 +75,23 @@ class Sina(requestbase):
         for stock_match_object in result:
             stock = stock_match_object.groups()
             code = stock[0] if stock[0] in codes else stock[0][2:] if stock[0][2:] in codes else stock[0]
+            price = float(stock[4])
+            if (price == 0 or float(stock[2])) and stock[12] == stock[22]:
+                # 如果价格为0，或者开盘价为0，买1价等于卖1价，是集合竞价
+                price = float(stock[12])
             stock_dict[code] = dict(
                 name=stock[1],
                 open=float(stock[2]),
                 lclose=float(stock[3]),
-                price=float(stock[4]),
+                price=price,
                 high=float(stock[5]),
                 low=float(stock[6]),
                 buy=float(stock[7]),
                 sell=float(stock[8]),
                 volume=int(stock[9]) if int(stock[9]) * float(stock[6]) < float(stock[10]) < int(stock[9]) * float(stock[5]) else int(stock[9]) * 100,
                 amount=float(stock[10]),
-                change=(float(stock[4]) - float(stock[3])) / float(stock[3]),
-                change_px=float(stock[4]) - float(stock[3]),
+                change=(price - float(stock[3])) / float(stock[3]),
+                change_px=price - float(stock[3]),
                 bid1_volume=int(stock[11]),
                 bid1=float(stock[12]),
                 bid2_volume=int(stock[13]),
@@ -111,8 +115,6 @@ class Sina(requestbase):
                 date=stock[31],
                 time=stock[32],
             )
-            if stock_dict[code]['time'] < '09:30':
-                get_default_logger().info("stock %s price is 0, %s" % (stock_dict[code]['name'], stock))
         return stock_dict
 
     def get_tline_url(self, stock):

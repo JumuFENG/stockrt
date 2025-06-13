@@ -162,9 +162,9 @@ class rtbase(abc.ABC):
 
     @staticmethod
     def format_array_list(
-        tlines: list[list[]],
+        tlines: list[list],
         cols: Optional[list[str]] = ['time', 'price', 'volume', 'amount']
-    ) -> Union[list[dict[]], tuple[tuple[]], pd.DataFrame, np.ndarray, List[Tuple[float, ...]]]:
+    ) -> Union[list[dict], tuple[tuple], list[tuple], Any]:
         """将K线/分时数据列表转换为指定格式。
 
         Args:

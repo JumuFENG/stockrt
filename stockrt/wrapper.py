@@ -1,5 +1,7 @@
 # coding:utf8
 import math
+import inspect
+import traceback
 from functools import lru_cache
 from typing import List, Dict, Any, Optional, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -74,6 +76,35 @@ class FetchWrapper(object):
             raise NotImplementedError(f"not yet implemented data source: {source}")
 
         return self._get_source(source)
+
+    @staticmethod
+    def default_source_order(api_name, secondary=False):
+        '''
+        return api_name, sources, parrallel
+        '''
+        if api_name == 'quotes':
+            return 'qtapi', ('tencent', 'sina', 'eastmoney'), False
+        elif api_name == 'quotes5':
+            return 'qt5api', ('sina', 'tencent', 'eastmoney'), False
+        elif api_name == 'tlines':
+            return 'tlineapi', ('sina', 'tencent', 'eastmoney'), False
+        elif api_name == 'mklines':
+            if not secondary:
+                return 'mklineapi', ('tencent', 'eastmoney', 'tdx', 'sina'), True
+            else:
+                return 'mklineapi', ('tencent'),  False
+        elif api_name == 'dklines':
+            if not secondary:
+                return 'dklineapi', ('eastmoney', 'tdx', 'tencent', 'sina'), True
+            else:
+                return 'dklineapi', ('tencent',), False
+        raise NotImplementedError
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def get_wrapper(func_name, secondary=False):
+        api_name, sources, parrallel = FetchWrapper.default_source_order(func_name, secondary)
+        return FetchWrapper(api_name, func_name, list(sources), parrallel=parrallel)
 
     @property
     def current_source_order(self) -> List[str]:
@@ -212,6 +243,7 @@ class FetchWrapper(object):
                 "Data source %s encountered an exception in parallel fetch: %s", 
                 source, str(e)
             )
+            self.logger.warning(traceback.format_exc())
             self._handle_empty_result(source)
             return {}
 
@@ -250,11 +282,6 @@ def rtsource(source: str) -> rtbase:
     return FetchWrapper.get_data_source(source)
 
 
-@lru_cache(maxsize=None)
-def _get_wrapper(api_name: str, func_name: str, sources: tuple, parrallel: bool = False) -> FetchWrapper:
-    return FetchWrapper(api_name, func_name, list(sources), parrallel=parrallel)
-
-
 def quotes(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     """获取行情数据, 根据数据源不同, 有的带有5档买卖信息数据, 有的不带. 可以获取指数的行情数据
 
@@ -265,7 +292,7 @@ def quotes(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     Returns:
         - Dict[str, Any]: 行情数据
     """
-    wrapper = _get_wrapper('qtapi', 'quotes', ('tencent', 'sina', 'eastmoney'))
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
     return wrapper.fetch(stocks)
 
 def quotes5(stocks: Union[str, List[str]]) -> Dict[str, Any]:
@@ -277,7 +304,7 @@ def quotes5(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     Returns:
         - Dict[str, Any]: 带有5档买卖信息的行情数据
     '''
-    wrapper = _get_wrapper('qt5api', 'quotes5', ('sina', 'tencent', 'eastmoney'))
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
     return wrapper.fetch(stocks)
 
 def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
@@ -290,17 +317,15 @@ def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     Returns:
         - Dict[str, Any]: 分时线数据
     '''
-    wrapper = _get_wrapper('tlineapi', 'tlines', ('sina', 'tencent', 'eastmoney'))
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
     return wrapper.fetch(stocks)
 
 def mklines(stocks: Union[str, List[str]], kltype=1, length=320, withqt=False) -> Dict[str, Any]:
-    sources = ('tencent',) if withqt else ('eastmoney', 'tdx', 'sina', 'tencent')
-    wrapper = _get_wrapper('mklineapi', 'mklines', sources, parrallel=True)
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name, withqt)
     return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
 
 def dklines(stocks: Union[str, List[str]], kltype=101, length=320, withqt=False) -> Dict[str, Any]:
-    sources = ('tencent',) if withqt else ('eastmoney', 'tdx', 'tencent', 'sina')
-    wrapper = _get_wrapper('dklineapi', 'dklines', sources, parrallel=True)
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name, withqt)
     return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
 
 def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
@@ -338,3 +363,4 @@ def qklines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320)
     if kltype in [101, 102, 103, 104, 105, 106]:
         return dklines(stocks, kltype=kltype, length=length, withqt=True)
     return mklines(stocks, kltype=kltype, length=length, withqt=True)
+
