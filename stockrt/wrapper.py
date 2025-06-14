@@ -11,6 +11,7 @@ from .sources.sina import Sina
 from .sources.tencent import Tencent
 from .sources.eastmoney import EastMoney
 from .sources.pymtdx import SrcTdx
+from .sources.pymths import SrcThs
 
 
 def get_fullcode(code):
@@ -54,6 +55,8 @@ class FetchWrapper(object):
             return EastMoney()
         if usrc == 'tdx':
             return SrcTdx()
+        if usrc == 'ths':
+            return SrcThs()
 
     @classmethod
     def get_data_source(self, source: str) -> rtbase:
@@ -72,6 +75,8 @@ class FetchWrapper(object):
             source = 'eastmoney'
         elif source in ['tdx', 'pytdx']:
             source = 'tdx'
+        elif source in ['ths', 'thsdk']:
+            source = 'ths'
         else:
             raise NotImplementedError(f"not yet implemented data source: {source}")
 
@@ -83,19 +88,19 @@ class FetchWrapper(object):
         return api_name, sources, parrallel
         '''
         if api_name == 'quotes':
-            return 'qtapi', ('tencent', 'sina', 'eastmoney'), False
+            return 'qtapi', ('tencent', 'ths', 'sina', 'eastmoney'), False
         elif api_name == 'quotes5':
-            return 'qt5api', ('sina', 'tencent', 'eastmoney'), False
+            return 'qt5api', ('sina', 'tencent', 'ths', 'eastmoney'), False
         elif api_name == 'tlines':
             return 'tlineapi', ('sina', 'tencent', 'eastmoney'), False
         elif api_name == 'mklines':
             if not secondary:
-                return 'mklineapi', ('tencent', 'eastmoney', 'tdx', 'sina'), True
+                return 'mklineapi', ('tencent', 'ths', 'eastmoney', 'tdx', 'sina'), True
             else:
                 return 'mklineapi', ('tencent'),  False
         elif api_name == 'dklines':
             if not secondary:
-                return 'dklineapi', ('eastmoney', 'tdx', 'tencent', 'sina'), True
+                return 'dklineapi', ('eastmoney', 'tdx', 'ths', 'tencent', 'sina'), True
             else:
                 return 'dklineapi', ('tencent',), False
         raise NotImplementedError
