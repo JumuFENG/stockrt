@@ -1,11 +1,17 @@
 from setuptools import setup, find_packages
+import re
 
-from stockrt import __version__
 srt_name = 'stockrt'
+version = ''
+with open('stockrt/__init__.py', 'r') as f:
+    version = re.search(
+        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+        f.read(),
+        re.MULTILINE).group(1)
 
 setup(
     name=srt_name,
-    version=__version__,
+    version=version,
     packages=find_packages(),
     include_package_data=True,
     install_requires=["requests"]

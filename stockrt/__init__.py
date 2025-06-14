@@ -1,4 +1,4 @@
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __author__ = 'JumuFENG'
 
 from .sources.rtbase import set_default_logger as set_logger
