@@ -10,6 +10,7 @@ from .sources.rtbase import get_default_logger, rtbase
 from .sources.sina import Sina
 from .sources.tencent import Tencent
 from .sources.eastmoney import EastMoney
+from .sources.xueqiu import Xueqiu
 from .sources.pymtdx import SrcTdx
 from .sources.pymths import SrcThs
 
@@ -53,6 +54,8 @@ class FetchWrapper(object):
             return Tencent()
         if usrc == 'eastmoney':
             return EastMoney()
+        if usrc == 'xueqiu':
+            return Xueqiu()
         if usrc == 'tdx':
             return SrcTdx()
         if usrc == 'ths':
@@ -73,6 +76,8 @@ class FetchWrapper(object):
             source = 'tencent'
         elif source in ['em', 'eastmoney']:
             source = 'eastmoney'
+        elif source in ['xq', 'xueqiu']:
+            source = 'xueqiu'
         elif source in ['tdx', 'pytdx']:
             source = 'tdx'
         elif source in ['ths', 'thsdk']:
@@ -88,19 +93,19 @@ class FetchWrapper(object):
         return api_name, sources, parrallel
         '''
         if api_name == 'quotes':
-            return 'qtapi', ('tencent', 'ths', 'sina', 'eastmoney'), False
+            return 'qtapi', ('tencent', 'ths', 'sina', 'xueqiu', 'eastmoney'), False
         elif api_name == 'quotes5':
-            return 'qt5api', ('sina', 'tencent', 'ths', 'eastmoney'), False
+            return 'qt5api', ('sina', 'tencent', 'ths', 'xueqiu', 'eastmoney'), False
         elif api_name == 'tlines':
             return 'tlineapi', ('sina', 'tencent', 'eastmoney'), False
         elif api_name == 'mklines':
             if not secondary:
-                return 'mklineapi', ('tencent', 'ths', 'eastmoney', 'tdx', 'sina'), True
+                return 'mklineapi', ('tencent', 'xueqiu', 'ths', 'eastmoney', 'tdx', 'sina'), True
             else:
                 return 'mklineapi', ('tencent'),  False
         elif api_name == 'dklines':
             if not secondary:
-                return 'dklineapi', ('eastmoney', 'tdx', 'ths', 'tencent', 'sina'), True
+                return 'dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'ths', 'tencent', 'sina'), True
             else:
                 return 'dklineapi', ('tencent',), False
         raise NotImplementedError

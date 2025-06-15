@@ -259,7 +259,9 @@ class requestbase(rtbase):
             fcode = self.get_fullcode(stock) if isinstance(stock, str) else [self.get_fullcode(s) for s in stock]
             url, headers = url_func(fcode, **url_kwargs)
             try:
-                data = self.session.get(url, headers=headers)
+                if headers:
+                    self.session.headers.update(headers)
+                data = self.session.get(url)
                 if data and data.text:
                     return [stock, data.text]
             except Exception as e:
