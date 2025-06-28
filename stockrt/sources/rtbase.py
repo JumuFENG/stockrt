@@ -44,9 +44,12 @@ def set_array_format(fmt:str):
     序列数据(tlines/klines)返回格式，默认返回纯序列，需注意各字段的含义.
 
     :param fmt str: 'list' | 'tuple' | 'dict' = 'json' | 'pd' | 'df' | 'np'
+    :return str: 旧格式
     '''
     global _DEFAULT_ARRAY_FORMAT
+    old_fmt = _DEFAULT_ARRAY_FORMAT
     _DEFAULT_ARRAY_FORMAT = fmt
+    return old_fmt
 
 def get_array_format():
     if _DEFAULT_ARRAY_FORMAT == 'np' and not importlib.util.find_spec("numpy"):
@@ -77,6 +80,7 @@ class rtbase(abc.ABC):
         """
         assert isinstance(stock_code, str), "stock code need str type"
 
+        stock_code = stock_code.lower()
         if stock_code.startswith(("sh", "sz", "zz", "bj")):
             assert len(stock_code) == 8, "full stock code length should be 8"
             return stock_code
@@ -132,6 +136,10 @@ class rtbase(abc.ABC):
     @property
     @abc.abstractmethod
     def dklineapi(self):
+        pass
+
+    @property
+    def fklineapi(self):
         pass
 
     def _stock_groups(self, stocks):
@@ -196,24 +204,29 @@ class rtbase(abc.ABC):
             return np.array(tlines)
 
     @abc.abstractmethod
-    def mklines(self, stocks, kltype, length=320, withqt=False):
+    def mklines(self, stocks, kltype, length=320, fq=0, withqt=False):
         '''
         分钟K线数据
         '''
         pass
 
     @abc.abstractmethod
-    def dklines(self, stocks, kltype=101, length=320, withqt=False):
+    def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
         ''' 日K线或更大周期K线数据
         '''
         pass
 
-    @abc.abstractmethod
-    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    def fklines(self, stocks, kltype=101, fq=0):
+        ''' 获取全部K线数据
+        '''
         pass
 
     @abc.abstractmethod
-    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
+        pass
+
+    @abc.abstractmethod
+    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
         pass
 
 
@@ -231,11 +244,14 @@ class requestbase(rtbase):
         pass
 
     @abc.abstractmethod
-    def get_mkline_url(self, stock, kltype='1', length=320):
+    def get_mkline_url(self, stock, kltype='1', length=320, fq=1):
         pass
 
     @abc.abstractmethod
-    def get_dkline_url(self, stock, kltype='101', length=320):
+    def get_dkline_url(self, stock, kltype='101', length=320, fq=1):
+        pass
+
+    def get_fkline_url(self, stock, kltype='101', fq=0):
         pass
 
     def _get_headers(self):
@@ -256,7 +272,7 @@ class requestbase(rtbase):
         results = []
 
         def fetch_single(stock):
-            fcode = self.get_fullcode(stock) if isinstance(stock, str) else [self.get_fullcode(s) for s in stock]
+            fcode = [self.get_fullcode(s) for s in stock] if isinstance(stock, (list, tuple)) else self.get_fullcode(stock)
             url, headers = url_func(fcode, **url_kwargs)
             try:
                 if headers:
@@ -296,25 +312,35 @@ class requestbase(rtbase):
     def tlines(self, stocks):
         return self._fetch_concurrently(stocks, self.get_tline_url, self.format_tline_response)
 
-    def mklines(self, stocks, kltype, length=320, withqt=False):
+    def mklines(self, stocks, kltype, length=320, fq=1, withqt=False):
+        if not self.mklineapi:
+            return
         kltype = self.to_int_kltype(kltype)
-        return self._fetch_concurrently(stocks, self.get_mkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': True, 'withqt': withqt})
+        return self._fetch_concurrently(stocks, self.get_mkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length, 'fq': fq}, fmt_kwargs={'is_minute': True, 'withqt': withqt})
 
-    def dklines(self, stocks, kltype=101, length=320, withqt=False):
+    def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
+        if not self.dklineapi:
+            return
         kltype = self.to_int_kltype(kltype)
-        return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length}, fmt_kwargs={'is_minute': False, 'withqt': withqt})
+        return self._fetch_concurrently(stocks, self.get_dkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'length': length, 'fq': fq}, fmt_kwargs={'is_minute': False, 'fq': fq, 'withqt': withqt})
 
-    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    def fklines(self, stocks, kltype=101, fq=0):
+        if not self.fklineapi:
+            return
+        kltype = self.to_int_kltype(kltype)
+        return self._fetch_concurrently(stocks, self.get_fkline_url, self.format_kline_response, url_kwargs={'kltype': kltype, 'fq': fq}, fmt_kwargs={'is_minute': kltype < 100 or kltype % 15 == 0, 'fq': fq, 'withqt': False})
+
+    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
         kltype = self.to_int_kltype(kltype)
         if kltype in [101, 102, 103, 104, 105, 106]:
-            return self.dklines(stocks, kltype=kltype, length=length)
-        return self.mklines(stocks, kltype=kltype, length=length)
+            return self.dklines(stocks, kltype=kltype, length=length, fq=fq)
+        return self.mklines(stocks, kltype=kltype, length=length, fq=fq)
 
-    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
         kltype = self.to_int_kltype(kltype)
         if kltype in [101, 102, 103, 104, 105, 106]:
-            return self.dklines(stocks, kltype=kltype, length=length, withqt=True)
-        return self.mklines(stocks, kltype=kltype, length=length, withqt=True)
+            return self.dklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
+        return self.mklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
 
 
 class NoneSourcePy(rtbase):
@@ -343,14 +369,14 @@ class NoneSourcePy(rtbase):
     def tlines(self, stocks):
         pass
 
-    def mklines(self, stocks, kltype, length=320, withqt=False):
+    def mklines(self, stocks, kltype, length=320, fq=1, withqt=False):
         pass
 
-    def dklines(self, stocks, kltype=101, length=320, withqt=False):
+    def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
         pass
 
-    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
         pass
 
-    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+    def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
         pass

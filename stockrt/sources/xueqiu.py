@@ -44,7 +44,7 @@ class Xueqiu(requestbase):
     @property
     def mklineapi(self):
         return ('https://stock.xueqiu.com/v5/stock/chart/kline.json?'
-        'symbol=%s&begin=%d&period=%s&type=before&count=-%d'
+        'symbol=%s&begin=%d&period=%s&type=%s&count=-%d'
         '&indicator=kline')
     # &indicator=kline,pe,pb,ps,pcf,market_capital,agt,ggt,balance
 
@@ -105,7 +105,10 @@ class Xueqiu(requestbase):
             q = json.loads(rsp)['data']
             if not q:
                 continue
+            qdt = datetime.fromtimestamp(q['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+            qdate, qtime = qdt.split()
             stock_dict[code] = {
+                'price': q['current'], 'date': qdate, 'time': qtime,
                 'bid1': q['bp1'], 'ask1': q['sp1'], 'bid1_volume': q['bc1'], 'ask1_volume': q['sc1'],
                 'bid2': q['bp2'], 'ask2': q['sp2'], 'bid2_volume': q['bc2'], 'ask2_volume': q['sc2'],
                 'bid3': q['bp3'], 'ask3': q['sp3'], 'bid3_volume': q['bc3'], 'ask3_volume': q['sc3'],
@@ -131,10 +134,11 @@ class Xueqiu(requestbase):
             result[c] = self.format_array_list(tldata, ['time', 'price', 'volume', 'amount', 'avg_price'])
         return result
 
-    def get_mkline_url(self, stock, kltype='1', length=320):
-        return self.mklineapi % (self.get_fullcode(stock).upper(), int(time.time()*1000), f'{kltype}m', length), self._get_headers()
+    def get_mkline_url(self, stock, kltype='1', length=320, fq=0):
+        fqs = {0: 'normal', 1: 'before', 2: 'after'}
+        return self.mklineapi % (self.get_fullcode(stock).upper(), int(time.time()*1000), f'{kltype}m', fqs[fq], length), self._get_headers()
 
-    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
+    def format_kline_response(self, rep_data, **kwargs):
         result = {}
         for code, rsp in rep_data:
             data = json.loads(rsp)['data']
@@ -152,16 +156,22 @@ class Xueqiu(requestbase):
                     x[cols['high']],
                     x[cols['low']],
                     x[cols['volume']],
-                    x[cols['amount']]
+                    x[cols['amount']],
+                    x[cols['percent']] / 100,
+                    x[cols['chg']],
+                    x[cols['turnoverrate']] / 100
                 ])
-            result[code] = self.format_array_list(karr, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
+            result[code] = self.format_array_list(
+                karr, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount', 'change', 'change_px', 'turnover']
+            )
         return result
 
-    def get_dkline_url(self, stock, kltype='101', length=320):
+    def get_dkline_url(self, stock, kltype='101', length=320, fq=1):
         kltype = self.to_int_kltype(kltype)
         if kltype < 100 or kltype % 15 == 0:
             return self.get_mkline_url(stock, kltype, length)
         period = {
             101: 'day', 102: 'week', 103: 'month', 104: 'quarter', 106: 'year'
         }
-        return self.dklineapi % (self.get_fullcode(stock).upper(), int(time.time()*1000), period[kltype], length), self._get_headers()
+        fqs = {0: 'normal', 1: 'before', 2: 'after'}
+        return self.dklineapi % (self.get_fullcode(stock).upper(), int(time.time()*1000), period[kltype], fqs[fq], length), self._get_headers()

@@ -11,6 +11,8 @@ from .sources.sina import Sina
 from .sources.tencent import Tencent
 from .sources.eastmoney import EastMoney
 from .sources.xueqiu import Xueqiu
+from .sources.cailianshe import CailianShe
+from .sources.sohu import Sohu
 from .sources.pymtdx import SrcTdx
 from .sources.pymths import SrcThs
 
@@ -56,6 +58,10 @@ class FetchWrapper(object):
             return EastMoney()
         if usrc == 'xueqiu':
             return Xueqiu()
+        if usrc == 'cailianshe':
+            return CailianShe()
+        if usrc == 'sohu':
+            return Sohu()
         if usrc == 'tdx':
             return SrcTdx()
         if usrc == 'ths':
@@ -78,6 +84,10 @@ class FetchWrapper(object):
             source = 'eastmoney'
         elif source in ['xq', 'xueqiu']:
             source = 'xueqiu'
+        elif source in ['cls', 'cailianshe']:
+            source = 'cailianshe'
+        elif source in ['sohu']:
+            source = 'sohu'
         elif source in ['tdx', 'pytdx']:
             source = 'tdx'
         elif source in ['ths', 'thsdk']:
@@ -87,33 +97,25 @@ class FetchWrapper(object):
 
         return self._get_source(source)
 
-    @staticmethod
-    def default_source_order(api_name, secondary=False):
-        '''
-        return api_name, sources, parrallel
-        '''
-        if api_name == 'quotes':
-            return 'qtapi', ('tencent', 'ths', 'sina', 'xueqiu', 'eastmoney'), False
-        elif api_name == 'quotes5':
-            return 'qt5api', ('sina', 'tencent', 'ths', 'xueqiu', 'eastmoney'), False
-        elif api_name == 'tlines':
-            return 'tlineapi', ('sina', 'tencent', 'eastmoney'), False
-        elif api_name == 'mklines':
-            if not secondary:
-                return 'mklineapi', ('tencent', 'xueqiu', 'ths', 'eastmoney', 'tdx', 'sina'), True
-            else:
-                return 'mklineapi', ('tencent'),  False
-        elif api_name == 'dklines':
-            if not secondary:
-                return 'dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'ths', 'tencent', 'sina'), True
-            else:
-                return 'dklineapi', ('tencent',), False
-        raise NotImplementedError
+    api_default_sources = {
+        # api_name, sources, parrallel
+        'quotes': ['qtapi', ('tencent', 'cls', 'ths', 'sina', 'xueqiu', 'eastmoney', 'sohu'), False],
+        'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'xueqiu', 'eastmoney', 'cls', 'sohu'), False],
+        'tlines': ['tlineapi', ('cls', 'sina', 'tencent', 'eastmoney', 'sohu'), False],
+        'mklines': ['mklineapi', ('tencent', 'xueqiu', 'ths', 'eastmoney', 'sina'), True],
+        'q_mklines': ['mklineapi', ('tencent'),  False], # 只有tencent可以同时获取quotes和kline
+        'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
+        'q_dklines': ['dklineapi', ('tencent',), False],
+        'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu'), True],
+    }
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def get_wrapper(func_name, secondary=False):
-        api_name, sources, parrallel = FetchWrapper.default_source_order(func_name, secondary)
+    def get_wrapper(func_name, withQ=False):
+        akey = f'q_{func_name}' if withQ else func_name
+        if akey not in FetchWrapper.api_default_sources:
+            raise NotImplementedError(f"not yet implemented api: {akey}")
+        api_name, sources, parrallel = FetchWrapper.api_default_sources[akey]
         return FetchWrapper(api_name, func_name, list(sources), parrallel=parrallel)
 
     @property
@@ -143,7 +145,21 @@ class FetchWrapper(object):
 
         # Handle parallel fetching when enabled and stocks list is large
         if self._parrallel and len(stocks_list) > 100 and len(self._current_sources) > 1:
-            return self._parallel_fetch(stocks_list, *args, **kwargs)
+            retry_count = 0
+            max_retries = 3
+            stocks_rem = stocks_list.copy()
+            paresult = {}
+            while stocks_rem and retry_count < max_retries:
+                paresult.update(self._parallel_fetch(stocks_rem, *args, **kwargs))
+                stocks_rem = [s for s in stocks_rem if s not in paresult]
+                if not stocks_rem:
+                    return paresult
+                retry_count += 1
+            if retry_count >= max_retries:
+                self.logger.error(
+                    "未完全获取，已重试 %d 次，剩余股票: %s", retry_count, stocks_rem
+                )
+            return paresult
 
         result = {}
         remaining_sources = self._current_sources.copy()
@@ -270,7 +286,7 @@ class FetchWrapper(object):
             self._current_sources.remove(source)
             if not self._parrallel:
                 self._current_sources.append(source)  # 移到末尾
-            self.logger.debug(f"数据源 {source} 返回空结果，已移到备用位置")
+            self.logger.error(f"数据源 {source} 返回空结果，已移到备用位置")
 
     def _try_reset_sources(self):
         """尝试重置数据源（当所有源都失败时）"""
@@ -291,6 +307,22 @@ def rtsource(source: str) -> rtbase:
     '''
     return FetchWrapper.get_data_source(source)
 
+
+def set_default_sources(key, func_name, sources, parrallel=False):
+    '''
+    设置默认数据源
+
+    Args:
+        key (str): key, 必须设置为func_name 或 'q_{func_name}'
+        func_name (str): 方法名 'quotes', 'quotes5', 'tlines', 'mklines', 'dklines' 之一
+        sources (list): 想要设置的数据源列表
+        parrallel (bool, optional): 是否多个数据源同时运行.
+            - False(默认): 设置的数据源会单独按顺序使用，如果前面的数据源请求失败则将其移到最后
+            - True: 设置的所有数据源会同时启动，如果数据源请求失败则会移出列表，全部数据源失效才会重新启用,
+                这种情况通常用于单个数据源有访问频率/总量限制的情况，
+                大部分数据源只能一次获取一支股票的K线数据，平均分到多个数据源进行请求也可以提高效率
+    '''
+    FetchWrapper.api_default_sources[key] = (func_name, sources, parrallel)
 
 def quotes(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     """获取行情数据, 根据数据源不同, 有的带有5档买卖信息数据, 有的不带. 可以获取指数的行情数据
@@ -330,15 +362,24 @@ def tlines(stocks: Union[str, List[str]]) -> Dict[str, Any]:
     wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
     return wrapper.fetch(stocks)
 
-def mklines(stocks: Union[str, List[str]], kltype=1, length=320, withqt=False) -> Dict[str, Any]:
+def mklines(stocks: Union[str, List[str]], kltype=1, length=320, fq=1, withqt=False) -> Dict[str, Any]:
     wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name, withqt)
-    return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
+    return wrapper.fetch(stocks, kltype=kltype, length=length, fq=fq, withqt=withqt)
 
-def dklines(stocks: Union[str, List[str]], kltype=101, length=320, withqt=False) -> Dict[str, Any]:
+def dklines(stocks: Union[str, List[str]], kltype=101, length=320, fq=1, withqt=False) -> Dict[str, Any]:
     wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name, withqt)
-    return wrapper.fetch(stocks, kltype=kltype, length=length, withqt=withqt)
+    return wrapper.fetch(stocks, kltype=kltype, length=length, fq=fq, withqt=withqt)
 
-def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+def fklines(stocks: Union[str, List[str]], kltype: Union[int,str]=101, fq=0) -> Dict[str, Any]:
+    ''' 获取全部K线数据, 一般用在日线及更大的周期，小的周期不保证能获取完整数据
+
+    Returns:
+        - Dict[str, Any]: {code1: [], code2: [] ...}
+    '''
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
+    return wrapper.fetch(stocks, kltype=kltype, fq=fq)
+
+def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
     ''' 获取K线数据, 可以获取指数的K线数据
 
     Args:
@@ -353,16 +394,20 @@ def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) 
             - 105/h/hy/hyear: 半年K线数据
             - 106/y/yr/year: 年K线数据
         length (int, optional): K线数据长度. Defaults to 320.
+        fq (int, optional): 是否复权. 
+            - 0: 不复权 
+            - 1: 前复权 Default.
+            - 2: 后复权  
 
     Returns:
         - Dict[str, Any]: {code1: [], code2: [] ...}
     '''
     kltype = rtbase.to_int_kltype(kltype)
     if kltype in [101, 102, 103, 104, 105, 106]:
-        return dklines(stocks, kltype=kltype, length=length)
-    return mklines(stocks, kltype=kltype, length=length)
+        return dklines(stocks, kltype=kltype, length=length, fq=fq)
+    return mklines(stocks, kltype=kltype, length=length, fq=fq)
 
-def qklines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
+def qklines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
     ''' 获取带有行情信息的K线数据, 有的数据源获取K线数据时会同时返回行情数据, 如果没有同时返回行情数据，
     即使调用该接口也不会包含行情数据, 参数与klines一样, 返回值格式有区别
 
@@ -371,6 +416,6 @@ def qklines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320)
     '''
     kltype = rtbase.to_int_kltype(kltype)
     if kltype in [101, 102, 103, 104, 105, 106]:
-        return dklines(stocks, kltype=kltype, length=length, withqt=True)
-    return mklines(stocks, kltype=kltype, length=length, withqt=True)
+        return dklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
+    return mklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
 

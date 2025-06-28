@@ -187,7 +187,7 @@ else:
                 kl['时间'].strftime('%Y-%m-%d' if kl['时间'].hour == 0 and kl['时间'].minute == 0 else '%Y-%m-%d %H:%M'), kl['开盘价'], kl['收盘价'], kl['最高价'], kl['最低价'], kl['成交量'], kl['总金额']
             ] for kl in result], ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
 
-        def mklines(self, stocks, kltype, length=320, withqt=False):
+        def mklines(self, stocks, kltype, length=320, fq=1, withqt=False):
             if isinstance(stocks, str):
                 stocks = [stocks]
             kltype = self.to_int_kltype(kltype)
@@ -198,13 +198,14 @@ else:
                 104: Interval.QUARTER, 106: Interval.YEAR
             }
             assert kltype in intervals, f'不支持的K线类型: {kltype}'
-            return {c : self.format_kline_response(self.thsapi.klines(self.to_ths_code(c), interval=intervals[kltype], count=length, adjust=Adjust.FORWARD)) for c in stocks}
+            adj = [Adjust.NONE, Adjust.FORWARD, Adjust.BACKWARD][fq]
+            return {c : self.format_kline_response(self.thsapi.klines(self.to_ths_code(c), interval=intervals[kltype], count=length, adjust=adj)) for c in stocks}
 
-        def dklines(self, stocks, kltype=101, length=320, withqt=False):
-            return self.mklines(stocks, kltype, length, withqt)
+        def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
+            return self.mklines(stocks, kltype, length, fq, withqt)
 
-        def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
-            return self.mklines(stocks, kltype, length, False)
+        def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
+            return self.mklines(stocks, kltype, length, fq, False)
 
-        def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
-            return self.mklines(stocks, kltype, length, True)
+        def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
+            return self.mklines(stocks, kltype, length, fq, True)

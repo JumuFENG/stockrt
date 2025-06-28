@@ -1,4 +1,9 @@
 # coding:utf8
+'''
+reference: https://pytdx-docs.readthedocs.io/zh-cn/latest/pytdx_hq/
+
+
+'''
 import importlib.util
 if importlib.util.find_spec("pytdx") is None:
     from .rtbase import NoneSourcePy as SrcTdx
@@ -7,12 +12,13 @@ else:
     import time
     import json
     import random
+    from datetime import datetime
     from concurrent.futures import ThreadPoolExecutor
     from functools import cached_property
     from typing import Callable, Any, Union, List, Dict
     from pytdx.hq import TdxHq_API
     from pytdx.config.hosts import hq_hosts
-    from .rtbase import rtbase
+    from .rtbase import rtbase, get_default_logger
 
 
     class SrcTdx(rtbase):
@@ -115,6 +121,8 @@ else:
             return self.search_best_tdx()[0]
 
         def format_quote_response(self, stocks, rep_data):
+            if not rep_data:
+                return {}
             result = {}
             for q in rep_data:
                 fcode = self.get_fullcode(q['code'])
@@ -165,32 +173,46 @@ else:
             return self.format_array_list([[q['price'], q['vol'] * 100] for q in rep_data], ['price', 'volume'])
 
         def tlines(self, stocks):
-            # TODO: get_history_minute_time_data 需传入日期，获取当天的分时数据的接口get_minute_time_data得到的结果有错误
             if isinstance(stocks, str):
                 stocks = [stocks]
 
-            return {c: self.format_tline_response(self.tdxapi.get_history_minute_time_data(self.to_pytdx_market(c), c[-6:], 20250530)) for c in stocks}
-            # return {c: self.format_tline_response(self.tdxapi.get_minute_time_data(self.to_pytdx_market(c), c[-6:])) for c in stocks}
+            today = datetime.now().strftime('%Y%m%d')
+            return {c: self.format_tline_response(self.tdxapi.get_history_minute_time_data(self.to_pytdx_market(c), c[-6:], today)) for c in stocks}
 
         def format_kline_response(self, rep_data):
             return self.format_array_list([[
                 kl['datetime'], kl['open'], kl['close'], kl['high'], kl['low'], kl['vol'], kl['amount']
             ] for kl in rep_data], ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
 
-        def mklines(self, stocks, kltype, length=320, withqt=False):
+        def mklines(self, stocks, kltype, length=320, fq=1, withqt=False):
             if isinstance(stocks, str):
                 stocks = [stocks]
+            if fq != 1:
+                get_default_logger().warning('pytdx不支持复权类型%s', fq)
+                return {}
+
             kltype = self.to_int_kltype(kltype)
             categories = {5: 0, 15: 1, 30: 2, 60: 3, 101: 4, 102: 5, 103: 6, 1: 8, 104: 10, 106: 11}
             # category: K线类型（0 5分钟K线; 1 15分钟K线; 2 30分钟K线; 3 1小时K线; 4 日K线; 5 周K线; 6 月K线; 7 1分钟; 8 1分钟K线; 9 日K线; 10 季K线; 11 年K线）
             assert kltype in categories, f'不支持的K线类型: {kltype}'
-            return {c : self.format_kline_response(self.tdxapi.get_security_bars(categories[kltype], self.to_pytdx_market(c), c[-6:], 0, length)) for c in stocks}
+            result = {}
+            failed = []
+            for c in stocks:
+                kldata = self.tdxapi.get_security_bars(categories[kltype], self.to_pytdx_market(c), c[-6:], 0, length)
+                if kldata:
+                    result[c] = self.format_kline_response(kldata)
+                else:
+                    failed.append(c)
+            if len(failed) > 0:
+                get_default_logger().warning('get kline failed: %d %s', kltype, failed)
+            return result
+            # return {c : self.format_kline_response(self.tdxapi.get_security_bars(categories[kltype], self.to_pytdx_market(c), c[-6:], 0, length)) for c in stocks}
 
-        def dklines(self, stocks, kltype=101, length=320, withqt=False):
-            return self.mklines(stocks, kltype, length, withqt)
+        def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
+            return self.mklines(stocks, kltype, length, fq, withqt)
 
-        def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
-            return self.mklines(stocks, kltype, length, False)
+        def klines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
+            return self.mklines(stocks, kltype, length, fq, False)
 
-        def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320) -> Dict[str, Any]:
-            return self.mklines(stocks, kltype, length, True)
+        def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
+            return self.mklines(stocks, kltype, length, fq, True)

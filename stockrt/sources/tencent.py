@@ -1,9 +1,9 @@
 # coding:utf8
 import re
-import time
 import json
+from datetime import datetime
 from typing import Optional
-from .rtbase import requestbase
+from .rtbase import requestbase, get_default_logger
 
 """
 reference: https://stockapp.finance.qq.com/mstats/
@@ -12,7 +12,7 @@ url 参数改动
 股票代码 :sh603444
 k线数：320
 url = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh603444,m5,,320&_var=m5_today&r=0.7732845199699612"
-
+该数据源K线数据不返回成交额，成交额是通过收盘价*成交量计算得出，不一定准确，特别是指数的成交额
 
 分时数据:
 https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var=&code=sh603444&r=0.8169133625890732
@@ -37,7 +37,7 @@ class Tencent(requestbase):
 
     @property
     def dklineapi(self):
-        return "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=&param=%s,%s,,,%d,qfq"
+        return "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=&param=%s,%s,,,%d,%s"
 
     def _get_headers(self):
         headers = super()._get_headers()
@@ -66,6 +66,10 @@ class Tencent(requestbase):
             except IndexError:
                 return None
 
+        if float(stock[3]) == 0:
+            get_default_logger().info("stock %s price is 0, %s" % (stock[1], stock))
+        qdt = datetime.strptime(stock[30], "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+        qdate, qtime = qdt.split(" ")
         return {
             "name": stock[1],
             "price": float(stock[3]),
@@ -95,8 +99,8 @@ class Tencent(requestbase):
             "ask5": float(stock[27]),
             "ask5_volume": int(stock[28]) * 100,
             "最近逐笔成交": stock[29],
-            # "date": stock[30][0:10],
-            # "time": stock[30][10:], # "datetime": datetime.strptime(stock[30], "%Y%m%d%H%M%S"),
+            "date": qdate,
+            "time": qtime, # "datetime": datetime.strptime(stock[30], "%Y%m%d%H%M%S"),
             "change_px": float(stock[31]),
             "change": float(stock[32]) / 100,
             "high": float(stock[33]),
@@ -155,16 +159,17 @@ class Tencent(requestbase):
             result[c] = self.format_array_list(tlobjs, ['time', 'price', 'volume', 'amount'])
         return result
 
-    def get_mkline_url(self, stock, kltype=1, length=320):
+    def get_mkline_url(self, stock, kltype=1, length=320, fq=0):
         return self.mklineapi % (stock, kltype, length), self._get_headers()
 
-    def get_dkline_url(self, stock, kltype=101, length=320):
+    def get_dkline_url(self, stock, kltype=101, length=320, fq=1):
         if kltype == 105:
             raise NotImplementedError('not available for half year in tencent source')
         kltype = {101: 'day', 102: 'week', 103: 'month', 104: 'season', 106: 'year'}[kltype]
-        return self.dklineapi % (stock, kltype, length), self._get_headers()
+        fqs = {0: '', 1: 'qfq', 2: 'hfq'}
+        return self.dklineapi % (stock, kltype, length, fqs[fq]), self._get_headers()
 
-    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
+    def format_kline_response(self, rep_data, is_minute=False, withqt=False, **kwargs):
         result = {}
         for c, v in rep_data:
             kdata = json.loads(v)
@@ -180,9 +185,10 @@ class Tencent(requestbase):
                 kl = kdata['data'][fcode][matched_key]
                 klines = [[
                     f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}' if is_minute else x[0],
-                    float(x[1]), float(x[2]), float(x[3]), float(x[4]), int(float(x[5]) * 100)
+                    float(x[1]), float(x[2]), float(x[3]), float(x[4]), int(float(x[5]) * 100),
+                    float(x[2]) * int(float(x[5]) * 100)
                 ] for x in kl]
-            klines = self.format_array_list(klines, ['time', 'open', 'close', 'high', 'low', 'volume'])
+            klines = self.format_array_list(klines, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
             result[c] = {
                 'klines': klines,
                 'qt': self.parse_quote(kdata['data'][fcode]['qt'][fcode]) if withqt else None

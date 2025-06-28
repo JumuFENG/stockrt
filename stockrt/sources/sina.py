@@ -8,6 +8,7 @@ from .rtbase import requestbase
 reference: https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
 
 K线
+新浪的K线不可以指定复权类型, 得到的数据默认是不复权的
 
 1: https://quotes.sina.cn/cn/api/jsonp_v2.php/x/CN_MarketDataService.getKLineData?symbol=sh601798&scale=1&ma=no&datalen=24
 
@@ -129,10 +130,10 @@ class Sina(requestbase):
                 ['time', 'price', 'volume', 'amount', 'avg_price'])
         return result
 
-    def get_mkline_url(self, stock, kltype='1', length=320):
+    def get_mkline_url(self, stock, kltype='1', length=320, fq=0):
         return self.mklineapi % (stock, kltype, length), self._get_headers()
 
-    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
+    def format_kline_response(self, rep_data, is_minute=False, **kwargs):
         result = {}
         kpattern = r'x\((\[.*?\])\);'
         for c, kltxt in rep_data:
@@ -152,7 +153,10 @@ class Sina(requestbase):
                 result[c] = self.format_array_list(karr, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
         return result
 
-    def get_dkline_url(self, stock, kltype=101, length=320):
+    def get_dkline_url(self, stock, kltype=101, length=320, fq=0):
+        if fq != 0:
+            from .rtbase import get_default_logger
+            get_default_logger().error('sina kline api only support fq=0')
         klt2scale = {101: 240, 102: 1200, 103: 7200, 106: 86400}
         assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
         return self.mklineapi % (stock, klt2scale[kltype], length), self._get_headers()

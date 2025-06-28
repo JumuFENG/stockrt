@@ -53,7 +53,7 @@ class EastMoney(requestbase):
     @property
     def mklineapi(self):
         return (
-            'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s&klt=%d&fqt=1&lmt=%d'
+            'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s&klt=%d&fqt=%d&lmt=%d'
             '&end=20500000&fields1=f1,f2,f3,f4,f5,f6,f7,f8'
             '&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64'
         )
@@ -61,6 +61,10 @@ class EastMoney(requestbase):
     @property
     def dklineapi(self):
         return self.mklineapi
+
+    @property
+    def fklineapi(self):
+        return self.mklineapi + '&beg=0'
 
     @staticmethod
     def get_secid(code):
@@ -155,6 +159,8 @@ class EastMoney(requestbase):
                 "ask4_volume": self._safe_price(fivequote['sale4_count']) * 100,
                 "ask5": self._safe_price(fivequote['sale5']),
                 "ask5_volume": self._safe_price(fivequote['sale5_count']) * 100,
+                "date": rtquote['date'][0:4] + '-' + rtquote['date'][4:6] + '-' + rtquote['date'][6:8],
+                "time": rtquote['time'],
             }
         return stock_dict
 
@@ -179,8 +185,8 @@ class EastMoney(requestbase):
             ], ['time', 'price', 'volume', 'amount', 'avg_price'])
         return stock_dict
 
-    def get_mkline_url(self, stock, kltype='1', length=320):
-        url = self.mklineapi % (self.get_secid(stock), kltype, length)
+    def get_mkline_url(self, stock, kltype='1', length=320, fq=1):
+        url = self.mklineapi % (self.get_secid(stock), kltype, fq, length)
         headers = {
             **self._get_headers(),
             'Referer': f'https://quote.eastmoney.com/{self.secid_to_fullcode(stock)}.html',
@@ -188,7 +194,7 @@ class EastMoney(requestbase):
         }
         return url, headers
 
-    def format_kline_response(self, rep_data, is_minute=False, withqt=False):
+    def format_kline_response(self, rep_data, **kwargs):
         stock_dict = dict()
         kcols = ['time', 'open', 'close', 'high', 'low', 'volume', 'amount', 'amplitude', 'change', 'change_px', 'turnover']
         for code, rsp in rep_data:
@@ -213,6 +219,15 @@ class EastMoney(requestbase):
 
         return stock_dict
 
-    def get_dkline_url(self, stock, kltype='101', length=320):
-        return self.get_mkline_url(stock, kltype, length)
+    def get_dkline_url(self, stock, kltype='101', length=320, fq=1):
+        return self.get_mkline_url(stock, kltype, length, fq)
+
+    def get_fkline_url(self, stock, kltype='101', fq=0):
+        url = self.fklineapi % (self.get_secid(stock), kltype, fq, 0)
+        headers = {
+            **self._get_headers(),
+            'Referer': f'https://quote.eastmoney.com/{self.secid_to_fullcode(stock)}.html',
+            'Host': 'push2his.eastmoney.com',
+        }
+        return url, headers
 
