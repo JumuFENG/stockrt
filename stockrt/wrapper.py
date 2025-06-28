@@ -13,6 +13,7 @@ from .sources.eastmoney import EastMoney
 from .sources.xueqiu import Xueqiu
 from .sources.cailianshe import CailianShe
 from .sources.sohu import Sohu
+from .sources.taogb import Taogb
 from .sources.pymtdx import SrcTdx
 from .sources.pymths import SrcThs
 
@@ -62,6 +63,8 @@ class FetchWrapper(object):
             return CailianShe()
         if usrc == 'sohu':
             return Sohu()
+        if usrc == 'tgb':
+            return Taogb()
         if usrc == 'tdx':
             return SrcTdx()
         if usrc == 'ths':
@@ -88,6 +91,8 @@ class FetchWrapper(object):
             source = 'cailianshe'
         elif source in ['sohu']:
             source = 'sohu'
+        elif source in ['tgb', 'taogb']:
+            source = 'tgb'
         elif source in ['tdx', 'pytdx']:
             source = 'tdx'
         elif source in ['ths', 'thsdk']:
@@ -99,14 +104,14 @@ class FetchWrapper(object):
 
     api_default_sources = {
         # api_name, sources, parrallel
-        'quotes': ['qtapi', ('tencent', 'cls', 'ths', 'sina', 'xueqiu', 'eastmoney', 'sohu'), False],
-        'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'xueqiu', 'eastmoney', 'cls', 'sohu'), False],
-        'tlines': ['tlineapi', ('cls', 'sina', 'tencent', 'eastmoney', 'sohu'), False],
+        'quotes': ['qtapi', ('tencent', 'cls', 'tgb', 'ths', 'sina', 'xueqiu', 'eastmoney', 'sohu'), False],
+        'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'xueqiu', 'eastmoney', 'cls', 'sohu', 'tgb'), False],
+        'tlines': ['tlineapi', ('cls', 'sina', 'tencent', 'eastmoney', 'sohu', 'tgb'), False],
         'mklines': ['mklineapi', ('tencent', 'xueqiu', 'ths', 'eastmoney', 'sina'), True],
         'q_mklines': ['mklineapi', ('tencent'),  False], # 只有tencent可以同时获取quotes和kline
         'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
         'q_dklines': ['dklineapi', ('tencent',), False],
-        'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu'), True],
+        'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],
     }
 
     @staticmethod
