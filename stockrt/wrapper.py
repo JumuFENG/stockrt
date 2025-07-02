@@ -4,7 +4,6 @@ import inspect
 import traceback
 from functools import lru_cache
 from typing import List, Dict, Any, Optional, Union
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .sources.rtbase import get_default_logger, rtbase
 from .sources.sina import Sina
@@ -154,7 +153,7 @@ class FetchWrapper(object):
             max_retries = 3
             stocks_rem = stocks_list.copy()
             paresult = {}
-            while stocks_rem and retry_count < max_retries:
+            while stocks_rem and retry_count < max_retries and len(self._current_sources) > 1:
                 paresult.update(self._parallel_fetch(stocks_rem, *args, **kwargs))
                 stocks_rem = [s for s in stocks_rem if s not in paresult]
                 if not stocks_rem:
@@ -204,8 +203,8 @@ class FetchWrapper(object):
 
     def _parallel_fetch(self, stocks_list: List[str], *args, **kwargs) -> Dict[str, Any]:
         """
-        Parallel fetching implementation that distributes stocks across available data sources.
-        
+        Sequential fetching implementation that processes stocks one source at a time.
+
         :param stocks_list: List of stock codes to fetch
         :return: Combined results from all data sources
         """
@@ -219,32 +218,20 @@ class FetchWrapper(object):
             for i in range(num_sources)
         ]
 
-        with ThreadPoolExecutor(max_workers=num_sources) as executor:
-            futures = {}
-            for i, source in enumerate(self._current_sources):
-                if i >= len(chunks) or not chunks[i]:
-                    continue
+        for i, source in enumerate(self._current_sources):
+            if i >= len(chunks) or not chunks[i]:
+                continue
 
-                futures[executor.submit(
-                    self._fetch_from_source,
-                    source,
-                    chunks[i],
-                    *args,
-                    **kwargs
-                )] = source
-
-            for future in as_completed(futures):
-                source = futures[future]
-                try:
-                    data = future.result()
-                    if data:
-                        result.update(data)
-                except Exception as e:
-                    self.logger.warning(
-                        "Parallel data source %s encountered an exception: %s", 
-                        source, str(e)
-                    )
-                    self._handle_empty_result(source)
+            try:
+                data = self._fetch_from_source(source, chunks[i], *args, **kwargs)
+                if data:
+                    result.update(data)
+            except Exception as e:
+                self.logger.warning(
+                    "Data source %s encountered an exception: %s", 
+                    source, str(e)
+                )
+                self._handle_empty_result(source)
 
         return result
 
@@ -291,7 +278,7 @@ class FetchWrapper(object):
             self._current_sources.remove(source)
             if not self._parrallel:
                 self._current_sources.append(source)  # 移到末尾
-            self.logger.error(f"数据源 {source} 返回空结果，已移到备用位置")
+            self.logger.error(f"数据源 {source}.{self.func_name} 返回空结果，已移到备用位置")
 
     def _try_reset_sources(self):
         """尝试重置数据源（当所有源都失败时）"""

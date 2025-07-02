@@ -286,7 +286,7 @@ class requestbase(rtbase):
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
-            for future in as_completed(futures):
+            for future in as_completed(futures, timeout=10):
                 data = future.result()
                 if data is not None:
                     results.append(data)

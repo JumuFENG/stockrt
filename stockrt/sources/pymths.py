@@ -13,8 +13,8 @@ else:
     import time
     from functools import lru_cache
     from typing import Any, Union, List, Dict
-    from thsdk import THS, Interval, Adjust
-    from thsdk._constants_ import *
+    from thsdk import THS
+    from thsdk._constants import *
     from .rtbase import rtbase
 
     class SrcThs(rtbase):
@@ -191,15 +191,19 @@ else:
             if isinstance(stocks, str):
                 stocks = [stocks]
             kltype = self.to_int_kltype(kltype)
+            minterval = [1, 5, 15, 30, 60, 120]
             intervals = {
-                1: Interval.MIN_1, 5: Interval.MIN_5, 15: Interval.MIN_15,
-                30: Interval.MIN_30, 60: Interval.MIN_60, 120: Interval.MIN_120,
-                101: Interval.DAY, 102: Interval.WEEK, 103: Interval.MONTH,
-                104: Interval.QUARTER, 106: Interval.YEAR
+                101: 'day', 102: 'week', 103: 'month',
+                104: 'quarter', 106: 'year'
             }
-            assert kltype in intervals, f'不支持的K线类型: {kltype}'
-            adj = [Adjust.NONE, Adjust.FORWARD, Adjust.BACKWARD][fq]
-            return {c : self.format_kline_response(self.thsapi.klines(self.to_ths_code(c), interval=intervals[kltype], count=length, adjust=adj)) for c in stocks}
+            if kltype in minterval:
+                kltype = f'{kltype}m'
+            elif kltype in (101, 102, 103, 104, 106):
+                kltype = intervals[kltype]
+            else:
+                raise ValueError(f'不支持的K线类型: {kltype}')
+            adj = ['', 'forward', 'backward'][fq]
+            return {c : self.format_kline_response(self.thsapi.klines(self.to_ths_code(c), interval=kltype, count=length, adjust=adj)) for c in stocks}
 
         def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
             return self.mklines(stocks, kltype, length, fq, withqt)

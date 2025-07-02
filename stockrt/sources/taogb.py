@@ -8,7 +8,7 @@ from .rtbase import requestbase
 """reference: https://www.tgb.cn/quotes/
 https://www.tgb.cn/quotes/sh601162
 
-quotes
+quotes (早盘集合竞价时返回的数据为前一天的数据)
 https://hq.tgb.cn/tgb/realHQList?stockCodeList=["sz002263","sz002104","sz002235","sz002579","sh601162"]
 行情（其中有买卖5档）
 https://hq.tgb.cn/tgb/sz002235
