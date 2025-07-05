@@ -12,16 +12,79 @@ else:
     import time
     import json
     import random
+    import socket
     from datetime import datetime
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from functools import cached_property
     from typing import Callable, Any, Union, List, Dict
     from pytdx.hq import TdxHq_API
     from pytdx.config.hosts import hq_hosts
     from .rtbase import rtbase, get_default_logger
 
+    class ClientWrapper:
+        """包装客户端，实现连接状态管理和上下文管理协议"""
+        def __init__(self, host):
+            self._tdx = TdxHq_API()
+            self._host = host
+            self._busy = False
+            self._sock = None
+
+        @property
+        def is_connected(self):
+            """获取当前连接状态"""
+            try:
+                self._sock.send(b'', socket.MSG_DONTWAIT)
+                return True
+            except Exception:
+                return False
+
+        @property
+        def busy(self):
+            """获取当前连接状态"""
+            return self._busy
+
+        def connect(self):
+            """连接到服务器"""
+            if self._sock and self.is_connected:
+                return True
+
+            try:
+                success = self._tdx.connect(*self._host)
+                if success:
+                    self._sock = self._tdx.client
+                return success
+            except Exception:
+                return False
+
+        def disconnect(self):
+            """断开连接"""
+            if not self._sock or not self.is_connected:
+                return
+
+            try:
+                self._tdx.disconnect()
+            finally:
+                self._sock = None
+
+        def __enter__(self):
+            """上下文管理入口"""
+            if not self.connect():
+                raise ConnectionError("Failed to connect to TDX server")
+            self._busy = True
+            return self._tdx
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            """上下文管理出口"""
+            self._busy = False
+            return False
+
+        def __getattr__(self, name):
+            """委托所有属性访问到底层客户端"""
+            return getattr(self._tdx, name)
+
 
     class SrcTdx(rtbase):
+        quote_max_num = 80
         @property
         def qtapi(self):
             return 'pyqtapi'
@@ -111,14 +174,12 @@ else:
             return [[h, p] for h, p, d in sorted_hosts]
 
         @cached_property
-        def tdxapi(self):
-            api = TdxHq_API()
-            if api.connect(*self.tdxhost):
-                return api
+        def tdxhosts(self):
+            return self.search_best_tdx()
 
         @cached_property
-        def tdxhost(self):
-            return self.search_best_tdx()[0]
+        def clients(self):
+            return [ClientWrapper(h) for h in self.tdxhosts]
 
         def format_quote_response(self, stocks, rep_data):
             if not rep_data:
@@ -163,8 +224,41 @@ else:
         def quotes(self, stocks):
             if isinstance(stocks, str):
                 stocks = [stocks]
-            qt = self.tdxapi.get_security_quotes([(self.to_pytdx_market(code), code[-6:]) for code in stocks])
-            return self.format_quote_response(stocks, qt)
+            batches = 1
+            if len(stocks) > self.quote_max_num:
+                batches = len(stocks) // self.quote_max_num + 1
+
+            wrappers = [next((c for c in self.clients if not c.busy), None)] if batches == 1 else [ c for c in self.clients if not c.busy][:batches]
+            if not wrappers:
+                return
+
+            batches = len(wrappers)
+            if batches == 1:
+                return self._get_quotes_for_group(wrappers[0], stocks)
+
+            batches = len(wrappers)
+            gsize = len(stocks) // batches + 1
+            result = {}
+            with ThreadPoolExecutor(max_workers=batches) as executor:
+                futures = {
+                    executor.submit(
+                        self._get_quotes_for_group,
+                        wrappers[i],
+                        stocks[i*gsize:(i+1)*gsize]
+                    ): i for i in range(batches)
+                }
+                for future in as_completed(futures):
+                    result.update(future.result())
+            return result
+
+        def _get_quotes_for_group(self, wrapper, stocks):
+            result = {}
+            with wrapper as client:
+                for i in range(0, len(stocks), self.quote_max_num):
+                    qt = client.get_security_quotes([(self.to_pytdx_market(code), code[-6:]) for code in stocks[i:i + self.quote_max_num]])
+                    if qt:
+                        result.update(self.format_quote_response(stocks[i:i + self.quote_max_num], qt))
+            return result
 
         def quotes5(self, stocks):
             return self.quotes(stocks)
@@ -177,9 +271,39 @@ else:
                 stocks = [stocks]
 
             today = datetime.now().strftime('%Y%m%d')
-            return {c: self.format_tline_response(self.tdxapi.get_history_minute_time_data(self.to_pytdx_market(c), c[-6:], today)) for c in stocks}
+            wrappers = [c for c in self.clients if not c.busy]
+            gsize = len(stocks) // len(wrappers) + 1
+            result = {}
+            with ThreadPoolExecutor(max_workers=len(wrappers)) as executor:
+                futures = {
+                    executor.submit(
+                        self._get_tlines_for_group,
+                        wrappers[i],
+                        stocks[i*gsize:(i+1)*gsize],
+                        today
+                    ): i for i in range(len(wrappers))
+                }
+                for future in as_completed(futures):
+                    result.update(future.result())
+
+            return result
+
+        def _get_tlines_for_group(self, wclient, stocks, date):
+            """处理单个股票组的K线获取"""
+            group_result = {}
+            with wclient as client:  # 每个线程获取独立的client
+                for code in stocks:
+                    try:
+                        data = client.get_history_minute_time_data(self.to_pytdx_market(code), code[-6:], date)
+                        group_result[code] = self.format_tline_response(data)
+                    except Exception as e:
+                        print(f"Failed to get klines for {code}: {str(e)}")
+                        group_result[code] = None
+            return group_result
 
         def format_kline_response(self, rep_data):
+            if not rep_data:
+                return None
             return self.format_array_list([[
                 kl['datetime'], kl['open'], kl['close'], kl['high'], kl['low'], kl['vol'], kl['amount']
             ] for kl in rep_data], ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
@@ -195,18 +319,43 @@ else:
             categories = {5: 0, 15: 1, 30: 2, 60: 3, 101: 4, 102: 5, 103: 6, 1: 8, 104: 10, 106: 11}
             # category: K线类型（0 5分钟K线; 1 15分钟K线; 2 30分钟K线; 3 1小时K线; 4 日K线; 5 周K线; 6 月K线; 7 1分钟; 8 1分钟K线; 9 日K线; 10 季K线; 11 年K线）
             assert kltype in categories, f'不支持的K线类型: {kltype}'
+
+            gsize = len(stocks) // len(self.tdxhosts) + 1
             result = {}
-            failed = []
-            for c in stocks:
-                kldata = self.tdxapi.get_security_bars(categories[kltype], self.to_pytdx_market(c), c[-6:], 0, length)
-                if kldata:
-                    result[c] = self.format_kline_response(kldata)
-                else:
-                    failed.append(c)
-            if len(failed) > 0:
-                get_default_logger().warning('get kline failed: %d %s', kltype, failed)
+            wrappers = [c for c in self.clients if not c.busy]
+            with ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
+                futures = {
+                    executor.submit(
+                        self._get_klines_for_group,
+                        wrappers[i],
+                        stocks[i*gsize:(i+1)*gsize],
+                        categories[kltype],
+                        length
+                    ): i for i in range(len(wrappers))
+                }
+
+                for future in as_completed(futures):
+                    result.update(future.result())
             return result
-            # return {c : self.format_kline_response(self.tdxapi.get_security_bars(categories[kltype], self.to_pytdx_market(c), c[-6:], 0, length)) for c in stocks}
+
+        def _get_klines_for_group(self, wclient, stocks, category, length=320, fq=1):
+            """处理单个股票组的K线获取"""
+            group_result = {}
+            with wclient as client:  # 每个线程获取独立的client
+                for code in stocks:
+                    try:
+                        data = client.get_security_bars(
+                            category,
+                            self.to_pytdx_market(code),
+                            code[-6:],
+                            0,
+                            length
+                        )
+                        group_result[code] = self.format_kline_response(data)
+                    except Exception as e:
+                        print(f"Failed to get klines for {code}: {str(e)}")
+                        group_result[code] = None
+            return group_result
 
         def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
             return self.mklines(stocks, kltype, length, fq, withqt)
