@@ -295,10 +295,10 @@ else:
                 for code in stocks:
                     try:
                         data = client.get_history_minute_time_data(self.to_pytdx_market(code), code[-6:], date)
-                        group_result[code] = self.format_tline_response(data)
+                        if data:
+                            group_result[code] = self.format_tline_response(data)
                     except Exception as e:
                         print(f"Failed to get klines for {code}: {str(e)}")
-                        group_result[code] = None
             return group_result
 
         def format_kline_response(self, rep_data):
@@ -351,10 +351,11 @@ else:
                             0,
                             length
                         )
-                        group_result[code] = self.format_kline_response(data)
+                        kdata = self.format_kline_response(data)
+                        if kdata:
+                            group_result[code] = kdata
                     except Exception as e:
                         print(f"Failed to get klines for {code}: {str(e)}")
-                        group_result[code] = None
             return group_result
 
         def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
