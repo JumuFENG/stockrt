@@ -10,10 +10,12 @@
 
 ### 安装
 
-目前没有发布到pip， 下载源码然后安装
+目前没有发布到pip， 下载源码或whl文件然后安装
 
 ```python
-python setup.py install
+pip install .
+or
+pip install stockrt-x.x.x.-py3-none-any.whl
 ```
 
 ### 用法
