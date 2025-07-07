@@ -13,30 +13,25 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Any, Union, List, Dict
 from functools import cached_property
 
-_DEFAULT_LOGGER = None
 
-def set_default_logger(logger: logging.Logger):
-    global _DEFAULT_LOGGER
-    if isinstance(_DEFAULT_LOGGER, logging.Logger):
-        for handler in _DEFAULT_LOGGER.handlers[:]:
-            _DEFAULT_LOGGER.removeHandler(handler)
-    else:
-        _DEFAULT_LOGGER = logger
+class RtbLogger:
+    def __init__(self):
+        self._logger = None
 
-    import importlib.util
-    if importlib.util.find_spec("pytdx"):
-        from pytdx.log import log
-        for handler in log.handlers[:]:
-            log.removeHandler(handler)
-        log.propagate = True
-        log.info("set pytdx logger propagate!")
+    def _init_logger(self):
+        if self._logger is None:
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(levelname)s | %(asctime)s-%(filename)s@%(lineno)d<%(name)s> %(message)s',
+            )
+            self._logger = logging.getLogger('stockrt')
 
-def get_default_logger():
-    if _DEFAULT_LOGGER is None:
-        logger = logging.getLogger('rtbase')
-        logger.addHandler(logging.NullHandler())
-        set_default_logger(logger)
-    return _DEFAULT_LOGGER
+    def __getattr__(self, name):
+        self._init_logger()
+        return getattr(self._logger, name)
+
+logger = RtbLogger()
+
 
 _DEFAULT_ARRAY_FORMAT = 'list'
 def set_array_format(fmt:str):
@@ -62,9 +57,6 @@ def get_array_format():
 class rtbase(abc.ABC):
     # 每次请求的最大股票数
     quote_max_num = 800
-    @property
-    def logger(self):
-        return get_default_logger()
 
     @staticmethod
     def get_fullcode(stock_code):
@@ -269,8 +261,6 @@ class requestbase(rtbase):
         if not isinstance(stocks, (list, tuple)):
             stocks = [stocks]
 
-        results = []
-
         def fetch_single(stock):
             fcode = [self.get_fullcode(s) for s in stock] if isinstance(stock, (list, tuple)) else self.get_fullcode(stock)
             url, headers = url_func(fcode, **url_kwargs)
@@ -281,17 +271,24 @@ class requestbase(rtbase):
                 if data and data.text:
                     return [stock, data.text]
             except Exception as e:
-                self.logger.error(f"fetch error: {url} {str(e)}")
+                logger.error(f"fetch error: {url} {str(e)}")
             return None
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
-            for future in as_completed(futures, timeout=10):
-                data = future.result()
-                if data is not None:
-                    results.append(data)
-
-        return format_func(results, **fmt_kwargs)
+        results = []
+        try:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
+                for future in as_completed(futures, timeout=max(10, len(stocks)//5)):
+                    data = future.result()
+                    if data is not None:
+                        results.append(data)
+        except TimeoutError as e:
+            logger.error(f"fetch timeout: {str(e)}")
+        except Exception as e:
+            logger.error(f"fetch error: {str(e)}")
+        finally:
+            if results:
+                return format_func(results, **fmt_kwargs)
 
     def format_quote_response(self, rep_data):
         return dict(rep_data)

@@ -5,7 +5,7 @@ import traceback
 from functools import lru_cache
 from typing import List, Dict, Any, Optional, Union
 
-from .sources.rtbase import get_default_logger, rtbase
+from .sources.rtbase import logger, rtbase
 from .sources.sina import Sina
 from .sources.tencent import Tencent
 from .sources.eastmoney import EastMoney
@@ -42,10 +42,6 @@ class FetchWrapper(object):
         self._current_sources = data_sources.copy()   # 当前可用数据源
         self._failed_sources = set()                  # 完全失败的数据源
         self._parrallel = parrallel
-
-    @property
-    def logger(self):
-        return get_default_logger()
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -104,9 +100,9 @@ class FetchWrapper(object):
     api_default_sources = {
         # api_name, sources, parrallel
         'quotes': ['qtapi', ('tencent', 'cls', 'tgb', 'ths', 'sina', 'xueqiu', 'eastmoney', 'sohu'), False],
-        'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'xueqiu', 'eastmoney', 'cls', 'sohu', 'tgb'), False],
+        'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'eastmoney', 'cls', 'sohu', 'tgb'), False],
         'tlines': ['tlineapi', ('cls', 'sina', 'tencent', 'eastmoney', 'sohu', 'tgb'), False],
-        'mklines': ['mklineapi', ('tencent', 'xueqiu', 'ths', 'eastmoney', 'sina'), True],
+        'mklines': ['mklineapi', ('tencent', 'ths', 'eastmoney', 'sina'), True],
         'q_mklines': ['mklineapi', ('tencent'),  False], # 只有tencent可以同时获取quotes和kline
         'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
         'q_dklines': ['dklineapi', ('tencent',), False],
@@ -142,7 +138,7 @@ class FetchWrapper(object):
         if not self._current_sources:
             self._try_reset_sources()
             if not self._current_sources:
-                self.logger.error("所有数据源均不可用")
+                logger.error("所有数据源均不可用")
                 return {}
 
         stocks_list = [stocks] if isinstance(stocks, str) else list(stocks)
@@ -160,7 +156,7 @@ class FetchWrapper(object):
                     return paresult
                 retry_count += 1
             if retry_count >= max_retries:
-                self.logger.error(
+                logger.error(
                     "未完全获取，已重试 %d 次，剩余股票: %s", retry_count, stocks_rem
                 )
             return paresult
@@ -194,7 +190,7 @@ class FetchWrapper(object):
                     return result
 
             except Exception as e:
-                self.logger.warning(
+                logger.warning(
                     "Data source %s encountered an exception: %s", source, str(e)
                 )
                 self._handle_empty_result(source)
@@ -227,7 +223,7 @@ class FetchWrapper(object):
                 if data:
                     result.update(data)
             except Exception as e:
-                self.logger.warning(
+                logger.warning(
                     "Data source %s encountered an exception: %s", 
                     source, str(e)
                 )
@@ -257,11 +253,11 @@ class FetchWrapper(object):
 
             return data
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Data source %s encountered an exception in parallel fetch: %s", 
                 source, str(e)
             )
-            self.logger.warning(traceback.format_exc())
+            logger.warning(traceback.format_exc())
             self._handle_empty_result(source)
             return {}
 
@@ -270,7 +266,7 @@ class FetchWrapper(object):
         if source in self._current_sources:
             self._current_sources.remove(source)
             self._failed_sources.add(source)
-            self.logger.warning(f"数据源 {source} 不可用，已临时禁用")
+            logger.warning(f"数据源 {source} 不可用，已临时禁用")
 
     def _handle_empty_result(self, source: str):
         """处理空结果数据源"""
@@ -278,12 +274,12 @@ class FetchWrapper(object):
             self._current_sources.remove(source)
             if not self._parrallel:
                 self._current_sources.append(source)  # 移到末尾
-            self.logger.error(f"数据源 {source}.{self.func_name} 返回空结果，已移到备用位置")
+            logger.error(f"数据源 {source}.{self.func_name} 返回空结果，已移到备用位置")
 
     def _try_reset_sources(self):
         """尝试重置数据源（当所有源都失败时）"""
         if not self._current_sources and self._original_sources:
-            self.logger.info("尝试重置数据源")
+            logger.info("尝试重置数据源")
             self._current_sources = [
                 s for s in self._original_sources
                 if s not in self._failed_sources

@@ -2,7 +2,7 @@
 import re
 import time
 import json
-from .rtbase import requestbase
+from .rtbase import requestbase, logger
 
 """
 reference: https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
@@ -155,8 +155,7 @@ class Sina(requestbase):
 
     def get_dkline_url(self, stock, kltype=101, length=320, fq=0):
         if fq != 0:
-            from .rtbase import get_default_logger
-            get_default_logger().error('sina kline api only support fq=0')
+            logger.error('sina kline api only support fq=0')
         klt2scale = {101: 240, 102: 1200, 103: 7200, 106: 86400}
         assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
         return self.mklineapi % (stock, klt2scale[kltype], length), self._get_headers()

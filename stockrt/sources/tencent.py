@@ -3,7 +3,7 @@ import re
 import json
 from datetime import datetime
 from typing import Optional
-from .rtbase import requestbase, get_default_logger
+from .rtbase import requestbase, logger
 
 """
 reference: https://stockapp.finance.qq.com/mstats/
@@ -67,7 +67,7 @@ class Tencent(requestbase):
                 return None
 
         if float(stock[3]) == 0:
-            get_default_logger().info("stock %s price is 0, %s" % (stock[1], stock))
+            logger.info("stock %s price is 0, %s" % (stock[1], stock))
         qdt = datetime.strptime(stock[30], "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
         qdate, qtime = qdt.split(" ")
         return {

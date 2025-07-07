@@ -17,9 +17,15 @@ else:
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from functools import cached_property
     from typing import Callable, Any, Union, List, Dict
+    from .rtbase import rtbase
     from pytdx.hq import TdxHq_API
     from pytdx.config.hosts import hq_hosts
-    from .rtbase import rtbase, get_default_logger
+
+    from pytdx.log import log as logger
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    logger.propagate = True
+    logger.info("set pytdx logger propagate!")
 
     class ClientWrapper:
         """包装客户端，实现连接状态管理和上下文管理协议"""
@@ -298,12 +304,10 @@ else:
                         if data:
                             group_result[code] = self.format_tline_response(data)
                     except Exception as e:
-                        print(f"Failed to get klines for {code}: {str(e)}")
+                        logger.error(f"Failed to get klines for {code}: {str(e)}")
             return group_result
 
         def format_kline_response(self, rep_data):
-            if not rep_data:
-                return None
             return self.format_array_list([[
                 kl['datetime'], kl['open'], kl['close'], kl['high'], kl['low'], kl['vol'], kl['amount']
             ] for kl in rep_data], ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
@@ -312,7 +316,7 @@ else:
             if isinstance(stocks, str):
                 stocks = [stocks]
             if fq != 1:
-                get_default_logger().warning('pytdx不支持复权类型%s', fq)
+                logger.warning('pytdx不支持复权类型%s', fq)
                 return {}
 
             kltype = self.to_int_kltype(kltype)
@@ -351,11 +355,10 @@ else:
                             0,
                             length
                         )
-                        kdata = self.format_kline_response(data)
-                        if kdata:
-                            group_result[code] = kdata
+                        if data:
+                            group_result[code] = self.format_kline_response(data)
                     except Exception as e:
-                        print(f"Failed to get klines for {code}: {str(e)}")
+                        logger.error(f"Failed to get klines for {code}: {str(e)}")
             return group_result
 
         def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
