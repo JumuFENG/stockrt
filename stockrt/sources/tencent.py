@@ -122,7 +122,7 @@ class Tencent(requestbase):
             "量比": self._safe_price(stock[49]),
             "委差": _safe_acquire_float(stock, 50),
             "avg_price": _safe_acquire_float(stock, 51), # 均价
-            "市盈(动)": _safe_acquire_float(stock, 52),
+            "TTM_PE": _safe_acquire_float(stock, 52),
             "市盈(静)": _safe_acquire_float(stock, 53),
         }
 

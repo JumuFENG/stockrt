@@ -30,7 +30,7 @@ class RtbLogger:
         self._init_logger()
         return getattr(self._logger, name)
 
-logger = RtbLogger()
+logger: logging.Logger = RtbLogger()
 
 
 _DEFAULT_ARRAY_FORMAT = 'list'

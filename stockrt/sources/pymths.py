@@ -17,9 +17,9 @@ else:
     from thsdk._constants import *
     from .rtbase import rtbase
     from thsdk.thsdk import logger
-    logger.propagate = True
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
+    logger.propagate = True
     logger.info("set thsdk logger propagate!")
 
     class SrcThs(rtbase):

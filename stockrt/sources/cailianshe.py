@@ -37,7 +37,7 @@ class CailianShe(requestbase):
         return (
             "https://x-quote.cls.cn/quote/stocks/basic?%s&fields=open_px,av_px,high_px,low_px,change,change_px,"
             "down_price,cmc,business_amount,business_balance,secu_name,secu_code,trade_status,secu_type,preclose_px,"
-            "up_price,last_px&secu_codes=%s"
+            "up_price,last_px,pe,ttm_pe,pb&secu_codes=%s"
         )
     
     @property
@@ -138,6 +138,9 @@ class CailianShe(requestbase):
                     'avg_price': data[stock]['av_px'],
                     'trade_status': data[stock]['trade_status'],
                     'secu_type': data[stock]['secu_type'],
+                    'PE': data[stock]['pe'],
+                    'TTM_PE': data[stock]['ttm_pe'],
+                    'PB': data[stock]['pb'],
                 }
         return result
 
