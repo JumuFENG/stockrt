@@ -77,9 +77,12 @@ class Xueqiu(requestbase):
             q = item['quote']
             qcode = q['symbol'].lower()
             code = qcode if qcode in codes else q['code'] if q['code'] in codes else qcode
+            qdt = datetime.fromtimestamp(q['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+            qdate, qtime = qdt.split()
             stock_dict[code] = {
                 'name': q['name'],
                 'price': q['current'],
+                'date': qdate, 'time': qtime,
                 'change': q['percent'] / 100,
                 'change_px': q['chg'],
                 'lclose': q['last_close'],

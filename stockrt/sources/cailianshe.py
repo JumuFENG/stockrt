@@ -46,7 +46,7 @@ class CailianShe(requestbase):
 
     @property
     def tlineapi(self):
-        return "https://q.stock.sohu.com/hisHq?code=%s&stat=1&order=D&period=1&callback=&rt=json"
+        return "https://x-quote.cls.cn/quote/index/tlines?%s&secu_codes=%s"
 
     @property
     def mklineapi(self):
@@ -90,7 +90,7 @@ class CailianShe(requestbase):
         return self._fetch_concurrently(stocks, self.get_quote5_url, self.format_quote5_response)
 
     def get_tline_url(self, stocks):
-        url = f"https://x-quote.cls.cn/quote/index/tlines?{self.clsbase_param}&secu_codes={','.join([self.get_secucode(s) for s in stocks])}"
+        url = self.tlineapi % (self.clsbase_param, ','.join([self.get_secucode(s) for s in stocks]))
         return url, self._get_headers()
 
     def tlines(self, stocks):
@@ -116,6 +116,8 @@ class CailianShe(requestbase):
 
     def format_quote_response(self, rep_data):
         result = {}
+        date = time.strftime('%Y-%m-%d', time.localtime())
+        time_str = time.strftime('%H:%M:%S', time.localtime())
         for codes, rsp in rep_data:
             data = json.loads(rsp)['data']
             for stock in data:
@@ -128,6 +130,7 @@ class CailianShe(requestbase):
                     'price': data[stock]['last_px'],
                     'high': data[stock]['high_px'],
                     'low': data[stock]['low_px'],
+                    'date': date, 'time': time_str,
                     'volume': int(data[stock]['business_amount']),
                     'amount': float(data[stock]['business_balance']),
                     'change': float(data[stock]['change']),

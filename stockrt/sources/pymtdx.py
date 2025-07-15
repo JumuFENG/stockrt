@@ -204,6 +204,7 @@ else:
                     'low': q['low'],
                     'open': q['open'],
                     'lclose': q['last_close'],
+                    'time': q['servertime'].split('.')[0],
                     'bid1': q['bid1'],
                     'bid2': q['bid2'],
                     'bid3': q['bid3'],
