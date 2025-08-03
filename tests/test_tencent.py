@@ -4,10 +4,10 @@ from stockrt import rtsource
 class TestTencentFunctions(unittest.TestCase):
     source = rtsource('qq')
     def test_single_stock_quotes(self):
-        stock_code = '000001'
+        stock_code = '688313'
         result = self.source.quotes(stock_code)
         self.assertIsInstance(result, dict)
-        stock_data = result.get('000001')
+        stock_data = result.get(stock_code)
         self.assertIsNotNone(stock_data)
         self.assertIsInstance(stock_data, dict)
         required_keys = ['name', 'price', 'change', 'high', 'low', 'open', 'lclose', 'volume', 'amount']
@@ -62,7 +62,7 @@ class TestTencentFunctions(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # suite = unittest.TestSuite()
-    # suite.addTest(TestTencentFunctions('test_list_of_stock_codes_qklines'))
-    # unittest.TextTestRunner().run(suite)
-    unittest.main()
+    suite = unittest.TestSuite()
+    suite.addTest(TestTencentFunctions('test_single_stock_quotes'))
+    unittest.TextTestRunner().run(suite)
+    # unittest.main()

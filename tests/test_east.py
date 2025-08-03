@@ -4,10 +4,10 @@ from stockrt import rtsource
 class TestEmFunctions(unittest.TestCase):
     source = rtsource('em')
     def test_single_stock_quotes(self):
-        stock_code = '000001'
+        stock_code = '688313'
         result = self.source.quotes(stock_code)
         self.assertIsInstance(result, dict)
-        stock_data = result.get('000001')
+        stock_data = result.get(stock_code)
         self.assertIsNotNone(stock_data)
         self.assertIsInstance(stock_data, dict)
         required_keys = ['name', 'price', 'change', 'high', 'low', 'open', 'lclose', 'volume', 'amount']
@@ -21,7 +21,7 @@ class TestEmFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_single_stock_quotes5(self):
-        stock_codes = '603610'
+        stock_codes = '688313'
         result = self.source.quotes5(stock_codes)
         self.assertIsInstance(result, dict)
 
@@ -70,6 +70,12 @@ class TestEmFunctions(unittest.TestCase):
 
 if __name__ == '__main__':
     # suite = unittest.TestSuite()
-    # suite.addTest(TestEmFunctions('test_single_stock_quotes'))
+    # suite.addTest(TestEmFunctions('test_single_stock_quotes5'))
     # unittest.TextTestRunner().run(suite)
-    unittest.main()
+    # unittest.main()
+    s = rtsource('em')
+    kl = s.klines('513050', 15, 64)['513050']
+    for k in kl:
+        print([k[0], k[1], k[2], k[3], k[4], k[8]])
+
+    # print(kl)

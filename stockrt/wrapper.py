@@ -103,7 +103,7 @@ class FetchWrapper(object):
         'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'eastmoney', 'cls', 'sohu', 'tgb'), False],
         'tlines': ['tlineapi', ('cls', 'sina', 'tencent', 'eastmoney', 'sohu', 'tgb'), False],
         'mklines': ['mklineapi', ('tencent', 'ths', 'eastmoney', 'sina'), True],
-        'q_mklines': ['mklineapi', ('tencent'),  False], # 只有tencent可以同时获取quotes和kline
+        'q_mklines': ['mklineapi', ('tencent',),  False], # 只有tencent可以同时获取quotes和kline
         'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
         'q_dklines': ['dklineapi', ('tencent',), False],
         'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],

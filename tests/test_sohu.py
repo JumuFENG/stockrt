@@ -2,11 +2,11 @@ import unittest
 from stockrt import rtsource
 
 
-class TestClsFunctions(unittest.TestCase):
+class TestSohuFunctions(unittest.TestCase):
     source = rtsource('sohu')
 
     def test_single_stock_quotes(self):
-        stock_code = '600030'
+        stock_code = '688313'
         result = self.source.quotes(stock_code)
         self.assertIsInstance(result, dict)
         stock_data = result.get(stock_code)
@@ -70,6 +70,6 @@ class TestClsFunctions(unittest.TestCase):
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestClsFunctions('test_single_stock_dklines'))
+    suite.addTest(TestSohuFunctions('test_single_stock_quotes'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()

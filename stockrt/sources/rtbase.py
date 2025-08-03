@@ -14,23 +14,7 @@ from typing import Callable, Any, Union, List, Dict
 from functools import cached_property
 
 
-class RtbLogger:
-    def __init__(self):
-        self._logger = None
-
-    def _init_logger(self):
-        if self._logger is None:
-            logging.basicConfig(
-                level=logging.INFO,
-                format='%(levelname)s | %(asctime)s-%(filename)s@%(lineno)d<%(name)s> %(message)s',
-            )
-            self._logger = logging.getLogger('stockrt')
-
-    def __getattr__(self, name):
-        self._init_logger()
-        return getattr(self._logger, name)
-
-logger: logging.Logger = RtbLogger()
+logger: logging.Logger = logging.getLogger('stockrt')
 
 
 _DEFAULT_ARRAY_FORMAT = 'list'
@@ -276,12 +260,16 @@ class requestbase(rtbase):
 
         results = []
         try:
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
-                for future in as_completed(futures, timeout=max(10, len(stocks)//5)):
-                    data = future.result()
-                    if data is not None:
-                        results.append(data)
+            if len(stocks) <= 3:
+                for stock in stocks:
+                    results.append(fetch_single(stock))
+            else:
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
+                    for future in as_completed(futures, timeout=max(10, len(stocks)//5)):
+                        data = future.result()
+                        if data is not None:
+                            results.append(data)
         except TimeoutError as e:
             logger.error(f"fetch timeout: {str(e)}")
         except Exception as e:
