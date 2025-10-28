@@ -4,6 +4,7 @@ import abc
 import logging
 import requests
 import importlib.util
+from functools import lru_cache
 if importlib.util.find_spec("numpy"):
     import numpy as np
 if importlib.util.find_spec("pandas"):
@@ -62,7 +63,7 @@ class rtbase(abc.ABC):
             return stock_code
 
         assert len(stock_code) == 6, "stock code length should be 6"
-        bj_head = ("4", "8", "92")
+        bj_head = ("43", "81", "83", "87", "92")
         sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
         if stock_code.startswith(bj_head):
             return f"bj{stock_code}"
@@ -90,6 +91,18 @@ class rtbase(abc.ABC):
             raise ValueError(f'invalid kltype: {kltype}')
         return kltype
 
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def get_market_stock_count():
+        url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=hs_a"
+        try:
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                return int(eval(resp.text.strip()))
+        except Exception as e:
+            logger.error(f"get_market_stock_count error: {str(e)}")
+            return 0
+
     @property
     @abc.abstractmethod
     def qtapi(self):
@@ -116,6 +129,10 @@ class rtbase(abc.ABC):
 
     @property
     def fklineapi(self):
+        pass
+
+    @property
+    def stocklistapi(self):
         pass
 
     def _stock_groups(self, stocks):
@@ -205,11 +222,19 @@ class rtbase(abc.ABC):
     def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
         pass
 
+    @abc.abstractmethod
+    def stock_list(self, market: str = 'all') -> Dict[str, Any]:
+        pass
+
 
 class requestbase(rtbase):
     @cached_property
     def session(self):
         return requests.session()
+
+    @property
+    def count_per_page(self):
+        return 100
 
     @abc.abstractmethod
     def get_quote_url(self, stocks):
@@ -230,15 +255,19 @@ class requestbase(rtbase):
     def get_fkline_url(self, stock, kltype='101', fq=0):
         pass
 
+    def get_stock_list_url(self, page: int = 1, market: str = 'all'):
+        pass
+
     def _get_headers(self):
         return {
             "Accept-Encoding": "gzip, deflate, sdch",
-            "User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0',
+            "User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0',
             'Connection': 'keep-alive',
         }
 
     def _fetch_concurrently(
         self, stocks, url_func: Callable, format_func: Callable,
+        convert_code: bool = True,
         url_kwargs: Optional[dict] = {}, fmt_kwargs: Optional[dict] = {}
     ):
         """并发获取数据的通用方法"""
@@ -246,7 +275,10 @@ class requestbase(rtbase):
             stocks = [stocks]
 
         def fetch_single(stock):
-            fcode = [self.get_fullcode(s) for s in stock] if isinstance(stock, (list, tuple)) else self.get_fullcode(stock)
+            if convert_code:
+                fcode = [self.get_fullcode(s) for s in stock] if isinstance(stock, (list, tuple)) else self.get_fullcode(stock)
+            else:
+                fcode = stock
             url, headers = url_func(fcode, **url_kwargs)
             try:
                 if headers:
@@ -286,6 +318,9 @@ class requestbase(rtbase):
 
     def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         return dict(rep_data)
+
+    def format_stock_list_response(self, rep_data, market='all'):
+        return rep_data
 
     def quotes(self, stocks):
         stocks = self._stock_groups(stocks)
@@ -327,6 +362,15 @@ class requestbase(rtbase):
             return self.dklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
         return self.mklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
 
+    def stock_list(self, market: Union[str, List[str]] = 'all') -> Dict[str, Any]:
+        pages = [i for i in range(1, self.get_market_stock_count() // self.count_per_page + 2)]
+        if isinstance(market, str):
+            return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})
+        result = {}
+        for mkt in market:
+            result.update(self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': mkt}, fmt_kwargs={'market': mkt}))
+        return result
+
 
 class NoneSourcePy(rtbase):
     @property
@@ -364,4 +408,7 @@ class NoneSourcePy(rtbase):
         pass
 
     def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
+        pass
+
+    def stock_list(self, market: str = 'all') -> Dict[str, Any]:
         pass

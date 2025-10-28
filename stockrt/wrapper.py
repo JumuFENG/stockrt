@@ -107,6 +107,7 @@ class FetchWrapper(object):
         'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
         'q_dklines': ['dklineapi', ('tencent',), False],
         'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],
+        'stock_list': ['stocklistapi', ('eastmoney', 'sina'), False],
     }
 
     @staticmethod
@@ -406,4 +407,20 @@ def qklines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320,
     if kltype in [101, 102, 103, 104, 105, 106]:
         return dklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
     return mklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
+
+def stock_list(market: str = 'all') -> Dict[str, Any]:
+    '''获取股票列表
+
+    Args:
+        market (str, optional): 市场. Defaults to 'all'.
+            - 'all': 全部市场
+            - 'sh': 上海市场
+            - 'sz': 深圳市场
+            - 'bj': 北京市场
+
+    Returns:
+        - List[Dict[str, Any]]: 股票列表
+    '''
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
+    return wrapper.fetch(market)
 

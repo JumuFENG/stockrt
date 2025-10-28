@@ -2,6 +2,7 @@
 import re
 import time
 import json
+import hashlib
 from .rtbase import requestbase
 
 """
@@ -27,6 +28,10 @@ https://x-quote.cls.cn/quote/stock/tline?app=CailianpressWeb&fields=date,minute,
 https://x-quote.cls.cn/quote/stock/tline_history?app=CailianpressWeb&os=web&secu_code=sh601011&sv=8.4.6&sign=36e01d1a347ffe8e65bf81f6e97dfbe3
 https://x-quote.cls.cn/quote/index/tlines?app=CailianpressWeb&os=web&secu_codes=sz000001,sh601011&sv=8.4.6&sign=9ea9e14dfc9a42ffde4591784cf23044
 
+股票列表-涨幅榜
+https://www.cls.cn/allStocks
+https://x-quote.cls.cn/web_quote/web_stock/stock_list?app=CailianpressWeb&market=all&os=web&page=2&rever=1&sv=8.4.6&types=last_px,change,tr,main_fund_diff,cmc,trade_status&sign=a2cd0e7449c4a2763db426a47f3edb40
+无法获取开盘价最高价最低价等信息
 """
 
 
@@ -197,3 +202,11 @@ class CailianShe(requestbase):
                 ])
             result[code] = self.format_array_list(klarr, kcols)
         return result
+
+    def get_signcode(self, param):
+        # 将param先hash再执行md5
+        hash_obj = hashlib.sha1(param.encode('utf-8'))
+        hash_hex = hash_obj.hexdigest()
+        md5_obj = hashlib.md5(hash_hex.encode('utf-8'))
+        signcode = md5_obj.hexdigest()
+        return signcode

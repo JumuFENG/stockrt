@@ -370,3 +370,6 @@ else:
 
         def qklines(self, stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, fq=1) -> Dict[str, Any]:
             return self.mklines(stocks, kltype, length, fq, True)
+
+        def stock_list(self, market = 'all'):
+            pass

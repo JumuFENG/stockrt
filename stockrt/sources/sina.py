@@ -17,6 +17,12 @@ K线
 接口1返回的是jsonp数据，接口2返回的是json数据，接口2没有scale 1/120
 
 分时数据:
+
+股票列表-涨幅榜
+https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=hs_a
+https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=4&num=40&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page
+https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=1&num=100&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page
+
 """
 
 
@@ -54,6 +60,11 @@ class Sina(requestbase):
     @property
     def dklineapi(self):
         return self.mklineapi
+
+    @property
+    def stocklistapi(self):
+        return ("https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/"
+                "Market_Center.getHQNodeData?page=%d&num=100&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page")
 
     def _get_headers(self):
         headers = super()._get_headers()
@@ -160,3 +171,30 @@ class Sina(requestbase):
         assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
         return self.mklineapi % (stock, klt2scale[kltype], length), self._get_headers()
 
+    def get_stock_list_url(self, page = 1, market = 'all'):
+        return self.stocklistapi % page, self._get_headers()
+
+    def format_stock_list_response(self, rep_data, market='all'):
+        result = {}
+        for pg, rsp in rep_data:
+            if pg not in result:
+                result[pg] = []
+            data = json.loads(rsp)
+            for stock in data:
+                result[pg].append({
+                    'code': stock['symbol'],
+                    'name': stock['name'],
+                    'close': float(stock['trade']),
+                    'high': float(stock['high']),
+                    'low': float(stock['low']),
+                    'open': float(stock['open']),
+                    'change_px': float(stock['pricechange']),
+                    'change': float(stock['changepercent']) / 100,
+                    'volume': int(stock['volume']) * 100,
+                    'amount': float(stock['amount']),
+                })
+        result_arr = []
+        for i in range(1, len(rep_data) + 1):
+            if i in result:
+                result_arr.extend(result[i])
+        return {market: result_arr}

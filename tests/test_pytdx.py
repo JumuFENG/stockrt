@@ -67,6 +67,6 @@ class TestTdxFunctions(unittest.TestCase):
 if __name__ == '__main__':
     suite = unittest.TestSuite()
     # suite.addTest(TestTdxFunctions('test_list_of_stock_codes_mklines'))
-    suite.addTest(TestTdxFunctions('test_single_stock_quotes'))
+    suite.addTest(TestTdxFunctions('test_single_stock_dklines'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()

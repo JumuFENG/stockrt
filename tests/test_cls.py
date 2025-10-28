@@ -62,9 +62,14 @@ class TestClsFunctions(unittest.TestCase):
         result = self.source.dklines(stock_codes, 'd', 10)
         self.assertIsInstance(result, dict)
 
+    def test_signcode_generation(self):
+        param = "app=CailianpressWeb&market=all&os=web&page=2&rever=1&sv=8.4.6&types=last_px,change,tr,main_fund_diff,cmc,trade_status"
+        expected_signcode = "a2cd0e7449c4a2763db426a47f3edb40"
+        generated_signcode = self.source.get_signcode(param)
+        self.assertEqual(generated_signcode, expected_signcode)
 
 if __name__ == '__main__':
-    # suite = unittest.TestSuite()
-    # suite.addTest(TestClsFunctions('test_single_stock_quotes'))
-    # unittest.TextTestRunner().run(suite)
-    unittest.main()
+    suite = unittest.TestSuite()
+    suite.addTest(TestClsFunctions('test_signcode_generation'))
+    unittest.TextTestRunner().run(suite)
+    # unittest.main()

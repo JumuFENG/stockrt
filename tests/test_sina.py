@@ -3,6 +3,11 @@ from stockrt import rtsource
 
 class TestSinaFunctions(unittest.TestCase):
     source = rtsource('sina')
+    def test_get_market_stock_count(self):
+        count = self.source.get_market_stock_count()
+        self.assertIsInstance(count, int)
+        self.assertGreater(count, 0)
+
     def test_single_stock_quotes(self):
         stock_code = '603390'
         result = self.source.quotes(stock_code)
@@ -50,9 +55,18 @@ class TestSinaFunctions(unittest.TestCase):
         result = self.source.dklines(stock_codes, 'd', 10)
         self.assertIsInstance(result, dict)
 
+    def test_get_stock_list(self):
+        result = self.source.stock_list(market='all')
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0)
+        for data in result:
+            self.assertIsInstance(data, dict)
+            self.assertIn('name', data)
+            self.assertIn('close', data)
+
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestSinaFunctions('test_single_stock_tlines'))
+    suite.addTest(TestSinaFunctions('test_get_stock_list'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()
