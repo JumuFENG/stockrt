@@ -136,8 +136,8 @@ class EastMoney(requestbase):
     def stocklistapi(self):
         return (
             "https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&cb="
-            "&fs=m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:2048"
-            "&fields=f1,f2,f3,f4,f5,f6,f15,f16,f17,f12,f13,f14,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f124"
+            "&fs=m:0+t:6+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:262144+f:!2"
+            "&fields=f1,f2,f3,f4,f5,f6,f15,f16,f17,f18,f12,f13,f14,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f124"
             "&fid=f3&pn=%d&pz=%d&po=1&dect=1&ut=fa5fd1943c7b386f172d6893dbfba10b&wbp2u=|0|0|0|web&_=%d"
         )
 
@@ -340,6 +340,7 @@ class EastMoney(requestbase):
                     'high': float(stock['f15']),
                     'low': float(stock['f16']),
                     'open': float(stock['f17']),
+                    'lclose': float(stock['f18']),
                     'change_px': float(stock['f4']),
                     'change': float(stock['f3']) / 100,
                     'volume': int(stock['f5']) * 100,

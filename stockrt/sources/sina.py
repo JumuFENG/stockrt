@@ -188,6 +188,7 @@ class Sina(requestbase):
                     'high': float(stock['high']),
                     'low': float(stock['low']),
                     'open': float(stock['open']),
+                    'lclose': float(stock['trade'] ) - float(stock['pricechange']),
                     'change_px': float(stock['pricechange']),
                     'change': float(stock['changepercent']) / 100,
                     'volume': int(stock['volume']) * 100,

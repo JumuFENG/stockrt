@@ -188,6 +188,8 @@ else:
 
         def format_kline_response(self, rep_data):
             result = rep_data.payload.result
+            if not result:
+                return result
             return self.format_array_list([[
                 kl['时间'].strftime('%Y-%m-%d' if kl['时间'].hour == 0 and kl['时间'].minute == 0 else '%Y-%m-%d %H:%M'), kl['开盘价'], kl['收盘价'], kl['最高价'], kl['最低价'], kl['成交量'], kl['总金额']
             ] for kl in result], ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])
@@ -208,7 +210,8 @@ else:
             else:
                 raise ValueError(f'不支持的K线类型: {kltype}')
             adj = ['', 'forward', 'backward'][fq]
-            return {c : self.format_kline_response(self.thsapi.klines(self.to_ths_code(c), interval=kltype, count=length, adjust=adj)) for c in stocks}
+            klinse = {c : self.format_kline_response(self.thsapi.klines(self.to_ths_code(c), interval=kltype, count=length, adjust=adj)) for c in stocks}
+            return {c: v for c, v in klinse.items() if v}
 
         def dklines(self, stocks, kltype=101, length=320, fq=1, withqt=False):
             return self.mklines(stocks, kltype, length, fq, withqt)
