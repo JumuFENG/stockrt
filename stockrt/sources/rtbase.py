@@ -91,10 +91,10 @@ class rtbase(abc.ABC):
             raise ValueError(f'invalid kltype: {kltype}')
         return kltype
 
-    @staticmethod
-    @lru_cache(maxsize=1)
-    def get_market_stock_count():
-        url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=hs_a"
+    @lru_cache(maxsize=10)
+    def get_market_stock_count(self, market: str = 'all') -> int:
+        market = {'all': 'hs_a', 'sha': 'sh_a', 'sza': 'sz_a', 'kcb': 'kcb', 'cyb': 'cyb', 'bjs': 'hs_bjs'}.get(market, 'hs_a')
+        url = f"https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node={market}"
         try:
             resp = requests.get(url, timeout=5)
             if resp.status_code == 200:
@@ -319,8 +319,22 @@ class requestbase(rtbase):
     def format_kline_response(self, rep_data, is_minute=False, withqt=False):
         return dict(rep_data)
 
+    def parse_stock_list(self, rep_data):
+        return []
+
+    def parse_totalcount(self, rep_data):
+        return 0
+
     def format_stock_list_response(self, rep_data, market='all'):
-        return rep_data
+        result = {}
+        for pg, rsp in rep_data:
+            result[pg] = self.parse_stock_list(rsp)
+
+        result_arr = []
+        for i in range(1, max(result.keys()) + 1):
+            if i in result:
+                result_arr.extend(result[i])
+        return {market: result_arr}
 
     def quotes(self, stocks):
         stocks = self._stock_groups(stocks)
@@ -362,13 +376,31 @@ class requestbase(rtbase):
             return self.dklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
         return self.mklines(stocks, kltype=kltype, length=length, fq=fq, withqt=True)
 
+    def first_page_with_totalcount(self, market='all'):
+        url, headers = self.get_stock_list_url(page=1, market=market)
+        self.session.headers.update(headers)
+        response = self.session.get(url)
+        response.raise_for_status()
+        stocks = self.parse_stock_list(response.text)
+        total_count = self.parse_totalcount(response.text)
+        return stocks, total_count
+
+    def stock_list_for_market(self, market: str = 'all') -> Dict[str, Any]:
+        stocks_1, total_count = self.first_page_with_totalcount(market)
+        if total_count <= len(stocks_1):
+            return {market: stocks_1}
+        if len(stocks_1) < self.count_per_page:
+            self.count_per_page = len(stocks_1)
+        pages = [i for i in range(2, total_count // self.count_per_page + 2)]
+        stocks = self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})
+        return {market: stocks_1 + stocks[market]}
+
     def stock_list(self, market: Union[str, List[str]] = 'all') -> Dict[str, Any]:
-        pages = [i for i in range(1, self.get_market_stock_count() // self.count_per_page + 2)]
         if isinstance(market, str):
-            return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})
+            return self.stock_list_for_market(market)
         result = {}
         for mkt in market:
-            result.update(self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': mkt}, fmt_kwargs={'market': mkt}))
+            result.update(self.stock_list_for_market(mkt))
         return result
 
 

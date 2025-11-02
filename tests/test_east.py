@@ -148,7 +148,7 @@ class TestEmCookie(unittest.TestCase):
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestEmFunctions('test_single_stock_quotes'))
+    suite.addTest(TestEmFunctions('test_get_stock_list'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()
     # print(kl)

@@ -57,6 +57,8 @@ class TestSinaFunctions(unittest.TestCase):
 
     def test_get_stock_list(self):
         result = self.source.stock_list(market='all')
+        self.assertIsInstance(result, dict)
+        result = result.get('all')
         self.assertIsInstance(result, list)
         self.assertGreater(len(result), 0)
         for data in result:

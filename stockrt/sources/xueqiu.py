@@ -25,6 +25,11 @@ https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=SH600759&begin=1749989
 分时数据:
 https://stock.xueqiu.com/v5/stock/chart/minute.json?symbol=SH000001&period=1d
 https://stock.xueqiu.com/v5/stock/chart/minute.json?symbol=SH600759&period=5d
+
+股票列表-涨幅榜
+https://xueqiu.com/hq/detail?type=sha&order=desc&orderBy=percent&market=CN&first_name=0&second_name=3
+https://stock.xueqiu.com/v5/stock/screener/quote/list.json?page=1&size=30&order=desc&order_by=percent&market=CN&type=sha
+无法获取开盘价最高价最低价等信息, 总共只有5000条数据尽管A股已经不止5000只股票
 """
 
 
@@ -51,6 +56,10 @@ class Xueqiu(requestbase):
     @property
     def dklineapi(self):
         return self.mklineapi
+
+    @property
+    def stocklistapi(self):
+        return "https://stock.xueqiu.com/v5/stock/screener/quote/list.json?page=%d&size=%d&order=desc&order_by=percent&market=CN&type=%s"
 
     @lru_cache(maxsize=1)
     def xueqiu_cookie(self):
@@ -178,3 +187,23 @@ class Xueqiu(requestbase):
         }
         fqs = {0: 'normal', 1: 'before', 2: 'after'}
         return self.dklineapi % (self.get_fullcode(stock).upper(), int(time.time()*1000), period[kltype], fqs[fq], length), self._get_headers()
+
+    def get_stock_list_url(self, page = 1, market = 'all'):
+        market = {'all': '', 'sha': 'sha', 'kcb': 'kcb', 'sza': 'sza', 'cyb': 'cyb'}.get(market, '')
+        return self.stocklistapi % (page, self.count_per_page, market), self._get_headers()
+
+    def parse_totalcount(self, rep_data):
+        return json.loads(rep_data)['data']['count']
+
+    def parse_stock_list(self, rep_data):
+        data = json.loads(rep_data)['data']['list']
+        return [{
+            'code': stock['symbol'].lower(),
+            'name': stock['name'],
+            'close': stock['current'],
+            'lclose': stock['current'] - stock['chg'],
+            'change_px': stock['chg'],
+            'change': stock['percent'] / 100,
+            'volume': stock['volume'],
+            'amount': stock['amount'],
+        } for stock in data]

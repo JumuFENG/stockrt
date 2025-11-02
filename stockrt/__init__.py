@@ -1,4 +1,4 @@
-__version__ = '0.0.7'
+__version__ = '1.0.1'
 __author__ = 'JumuFENG'
 
 from .sources.rtbase import set_array_format, logger

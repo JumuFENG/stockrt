@@ -136,7 +136,7 @@ class EastMoney(requestbase):
     def stocklistapi(self):
         return (
             "https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&cb="
-            "&fs=m:0+t:6+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:262144+f:!2"
+            "&fs=%s"
             "&fields=f1,f2,f3,f4,f5,f6,f15,f16,f17,f18,f12,f13,f14,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f124"
             "&fid=f3&pn=%d&pz=%d&po=1&dect=1&ut=fa5fd1943c7b386f172d6893dbfba10b&wbp2u=|0|0|0|web&_=%d"
         )
@@ -316,49 +316,46 @@ class EastMoney(requestbase):
         return url, headers
 
     def get_stock_list_url(self, page = 1, market = 'all'):
-        url = self.stocklistapi % (page, self.count_per_page, int(time.time()*1000))
+        fs = {
+            'all': 'm:0+t:6+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:262144+f:!2',
+            'sha': 'm:1+t:2+f:!2,m:1+t:23+f:!2',
+            'sza': 'm:0+t:6+f:!2,m:0+t:80+f:!2',
+            'kcb': 'm:1+t:23+f:!2',
+            'cyb': 'm:0+t:80+f:!2',
+            'bjs': 'm:0+t:81+s:262144+f:!2',
+        }
+        url = self.stocklistapi % (fs[market], page, self.count_per_page, int(time.time()*1000))
         headers = {
             **self._get_headers(),
             'Cookie': self.get_em_cookie(),
         }
         return url, headers
+    
+    def parse_totalcount(self, rep_data):
+        return json.loads(rep_data)['data']['total']
 
-    def format_stock_list_response(self, rep_data, market='all'):
-        result = {}
-        for pg, rsp in rep_data:
-            data = json.loads(rsp)['data']['diff']
-            for stock in data:
-                if stock['f2'] == '-':
-                    continue
-                fcode = self.secid_to_fullcode(f"{stock['f13']}.{stock['f12']}")
-                if pg not in result:
-                    result[pg] = []
-                result[pg].append({
-                    'code': fcode,
-                    'name': stock['f14'],
-                    'close': float(stock['f2']),
-                    'high': float(stock['f15']),
-                    'low': float(stock['f16']),
-                    'open': float(stock['f17']),
-                    'lclose': float(stock['f18']),
-                    'change_px': float(stock['f4']),
-                    'change': float(stock['f3']) / 100,
-                    'volume': int(stock['f5']) * 100,
-                    'amount': float(stock['f6']),
-                    'main': float(stock['f62']),
-                    'mainp': float(stock['f184']),
-                    'small': float(stock['f84']),
-                    'middle': float(stock['f78']),
-                    'big': float(stock['f72']),
-                    'super': float(stock['f66']),
-                    'smallp': float(stock['f87']),
-                    'midllep': float(stock['f81']),
-                    'bigp': float(stock['f75']),
-                    'superp': float(stock['f69']),
-                })
-
-        result_arr = []
-        for i in range(1, len(rep_data) + 1):
-            if i in result:
-                result_arr.extend(result[i])
-        return {market: result_arr}
+    def parse_stock_list(self, rep_data):
+        data = json.loads(rep_data)['data']['diff']
+        return [{
+            'code': self.secid_to_fullcode(f"{stock['f13']}.{stock['f12']}"),
+            'name': stock['f14'],
+            'close': float(stock['f2']),
+            'high': float(stock['f15']),
+            'low': float(stock['f16']),
+            'open': float(stock['f17']),
+            'lclose': float(stock['f18']),
+            'change_px': float(stock['f4']),
+            'change': float(stock['f3']) / 100,
+            'volume': int(stock['f5']) * 100,
+            'amount': float(stock['f6']),
+            'main': float(stock['f62']),
+            'mainp': float(stock['f184']),
+            'small': float(stock['f84']),
+            'middle': float(stock['f78']),
+            'big': float(stock['f72']),
+            'super': float(stock['f66']),
+            'smallp': float(stock['f87']),
+            'midllep': float(stock['f81']),
+            'bigp': float(stock['f75']),
+            'superp': float(stock['f69']),
+        } for stock in data if stock['f2'] != '-' and stock['f5'] != '-']

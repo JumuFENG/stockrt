@@ -5,7 +5,8 @@ import json
 from .rtbase import requestbase, logger
 
 """
-reference: https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
+reference: https://vip.stock.finance.sina.com.cn/mkt/
+https://finance.sina.com.cn/realstock/company/sh600798/nc.shtml
 
 K线
 新浪的K线不可以指定复权类型, 得到的数据默认是不复权的
@@ -19,6 +20,8 @@ K线
 分时数据:
 
 股票列表-涨幅榜
+https://vip.stock.finance.sina.com.cn/mkt/#stock_hs_up
+
 https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount?node=hs_a
 https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=4&num=40&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page
 https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=1&num=100&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page
@@ -64,7 +67,7 @@ class Sina(requestbase):
     @property
     def stocklistapi(self):
         return ("https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/"
-                "Market_Center.getHQNodeData?page=%d&num=100&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page")
+                "Market_Center.getHQNodeData?page=%d&num=100&sort=changepercent&asc=0&node=%s&symbol=&_s_r_a=page")
 
     def _get_headers(self):
         headers = super()._get_headers()
@@ -172,30 +175,25 @@ class Sina(requestbase):
         return self.mklineapi % (stock, klt2scale[kltype], length), self._get_headers()
 
     def get_stock_list_url(self, page = 1, market = 'all'):
-        return self.stocklistapi % page, self._get_headers()
+        market = {'all': 'hs_a', 'sha': 'sh_a', 'sza': 'sz_a', 'kcb': 'kcb', 'cyb': 'cyb', 'bjs': 'hs_bjs'}.get(market, 'hs_a')
+        return self.stocklistapi % (page, market), self._get_headers()
 
-    def format_stock_list_response(self, rep_data, market='all'):
-        result = {}
-        for pg, rsp in rep_data:
-            if pg not in result:
-                result[pg] = []
-            data = json.loads(rsp)
-            for stock in data:
-                result[pg].append({
-                    'code': stock['symbol'],
-                    'name': stock['name'],
-                    'close': float(stock['trade']),
-                    'high': float(stock['high']),
-                    'low': float(stock['low']),
-                    'open': float(stock['open']),
-                    'lclose': float(stock['trade'] ) - float(stock['pricechange']),
-                    'change_px': float(stock['pricechange']),
-                    'change': float(stock['changepercent']) / 100,
-                    'volume': int(stock['volume']) * 100,
-                    'amount': float(stock['amount']),
-                })
-        result_arr = []
-        for i in range(1, len(rep_data) + 1):
-            if i in result:
-                result_arr.extend(result[i])
-        return {market: result_arr}
+    def parse_stock_list(self, rep_data):
+        data = json.loads(rep_data)
+        return [{
+            'code': stock['symbol'],
+            'name': stock['name'],
+            'close': float(stock['trade']),
+            'high': float(stock['high']),
+            'low': float(stock['low']),
+            'open': float(stock['open']),
+            'lclose': float(stock['trade'] ) - float(stock['pricechange']),
+            'change_px': float(stock['pricechange']),
+            'change': float(stock['changepercent']) / 100,
+            'volume': int(stock['volume']) * 100,
+            'amount': float(stock['amount']),
+        } for stock in data]
+
+    def stock_list_for_market(self, market: str = 'all'):
+        pages = [i for i in range(1, self.get_market_stock_count(market) // self.count_per_page + 2)]
+        return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})

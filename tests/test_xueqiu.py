@@ -60,8 +60,22 @@ class TestXueqiuFunctions(unittest.TestCase):
         result = self.source.dklines(stock_codes, 'd', 10)
         self.assertIsInstance(result, dict)
 
+    def test_stock_list_retrieval(self):
+        market = 'all'
+        result = self.source.stock_list(market)
+        self.assertIsInstance(result, dict)
+        self.assertIn(market, result)
+        self.assertIsInstance(result[market], list)
+        self.assertGreater(len(result[market]), 0)
+        for stock in result[market]:
+            self.assertIn('code', stock)
+            self.assertIn('name', stock)
+            self.assertIn('close', stock)
+            self.assertIn('change', stock)
+
+
 if __name__ == '__main__':
-    # suite = unittest.TestSuite()
-    # suite.addTest(TestXueqiuFunctions('test_single_stock_quotes'))
-    # unittest.TextTestRunner().run(suite)
-    unittest.main()
+    suite = unittest.TestSuite()
+    suite.addTest(TestXueqiuFunctions('test_stock_list_retrieval'))
+    unittest.TextTestRunner().run(suite)
+    # unittest.main()

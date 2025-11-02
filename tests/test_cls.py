@@ -68,8 +68,20 @@ class TestClsFunctions(unittest.TestCase):
         generated_signcode = self.source.get_signcode(param)
         self.assertEqual(generated_signcode, expected_signcode)
 
+    def test_stock_list_retrieval(self):
+        market = 'all'
+        result = self.source.stock_list(market)
+        self.assertIsInstance(result, dict)
+        self.assertIn(market, result)
+        self.assertIsInstance(result[market], list)
+        self.assertGreater(len(result[market]), 0)
+        for stock in result[market]:
+            self.assertIn('code', stock)
+            self.assertIn('name', stock)
+            self.assertIn('close', stock)
+
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestClsFunctions('test_signcode_generation'))
+    suite.addTest(TestClsFunctions('test_stock_list_retrieval'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()

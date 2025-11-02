@@ -19,7 +19,7 @@ https://x-quote.cls.cn/quote/stock/volume?app=CailianpressWeb&field=five&os=web&
 
 K线
 https://x-quote.cls.cn/quote/stock/kline?app=CailianpressWeb&limit=50&offset=0&os=web&secu_code=sh688169&sv=7.7.5&type=fd1&sign=53d1663ea928a6bbcf026fc434f7ace0
-type: 
+type:
     fd1 日线, fw 周线, fm 月线, fy 年线 (前复权)
     d1 日线, w 周线, m 月线, y 年线 (不复权)
     bd1 日线, bw 周线, bm 月线, by 年线 (后复权)
@@ -44,7 +44,7 @@ class CailianShe(requestbase):
             "down_price,cmc,business_amount,business_balance,secu_name,secu_code,trade_status,secu_type,preclose_px,"
             "up_price,last_px,pe,ttm_pe,pb&secu_codes=%s"
         )
-    
+
     @property
     def qt5api(self):
         return "https://x-quote.cls.cn/quote/stock/volume?%s&field=five&secu_code=%s"
@@ -60,6 +60,16 @@ class CailianShe(requestbase):
     @property
     def dklineapi(self):
         return "https://x-quote.cls.cn/quote/stock/kline?%s&limit=%d&offset=0&secu_code=%s&type=%s%s"
+
+    @property
+    def stocklistapi(self):
+        return (
+            "https://x-quote.cls.cn/web_quote/web_stock/stock_list?%s&market=%s&page=%d&rever=1&types=%s"
+        )
+
+    @property
+    def count_per_page(self):
+        return 30
 
     def get_secucode(self, stock):
         fcode = self.get_fullcode(stock)
@@ -210,3 +220,26 @@ class CailianShe(requestbase):
         md5_obj = hashlib.md5(hash_hex.encode('utf-8'))
         signcode = md5_obj.hexdigest()
         return signcode
+
+    def get_stock_list_url(self, page = 1, market = 'all'):
+        types = 'last_px,change,tr,main_fund_diff,cmc,trade_status'
+        market = {'all': 'all', 'sha': 'h', 'sza': 's'}.get(market, 'all')
+        param = f'app=CailianpressWeb&market={market}&os=web&page={page}&rever=1&sv=8.4.6&types={types}'
+        signcode = self.get_signcode(param)
+        url = self.stocklistapi % (self.clsbase_param, market, page, types) + f"&sign={signcode}"
+        return url, self._get_headers()
+
+    def parse_stock_list(self, rep_data):
+        data = json.loads(rep_data)['data']['data']
+        return [{
+            'code': stock['secu_code'],
+            'name': stock['secu_name'],
+            'close': stock['last_px'],
+            'lclose': stock['last_px'] / (stock['change'] + 1),
+            'change_px': stock['last_px'] - stock['last_px'] / (stock['change'] + 1),
+            'change': stock['change'],
+        } for stock in data]
+
+    def stock_list_for_market(self, market: str = 'all'):
+        pages = [self.get_market_stock_count(market) // self.count_per_page + 1]
+        return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})

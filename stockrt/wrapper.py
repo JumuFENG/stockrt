@@ -107,7 +107,7 @@ class FetchWrapper(object):
         'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
         'q_dklines': ['dklineapi', ('tencent',), False],
         'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],
-        'stock_list': ['stocklistapi', ('eastmoney', 'sina'), False],
+        'stock_list': ['stocklistapi', ('eastmoney', 'sina', 'cls', 'tencent', 'xueqiu'), False],
     }
 
     @staticmethod
@@ -413,10 +413,12 @@ def stock_list(market: str = 'all') -> Dict[str, Any]:
 
     Args:
         market (str, optional): 市场. Defaults to 'all'.
-            - 'all': 全部市场
-            - 'sh': 上海市场
-            - 'sz': 深圳市场
-            - 'bj': 北京市场
+            - 'all': 全部A股
+            - 'sha': 上海市场
+            - 'sza': 深圳市场
+            - 'bjs': 北京市场
+            - 'cyb': 创业板
+            - 'kcb': 科创板
 
     Returns:
         - List[Dict[str, Any]]: 股票列表

@@ -17,6 +17,11 @@ url = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh603444,m5,,320&_v
 分时数据:
 https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var=&code=sh603444&r=0.8169133625890732
 https://web.ifzq.gtimg.cn/appstock/app/day/query?_var=&code=sh603444&r=0.8305712721067519
+
+股票列表-涨幅榜
+https://stockapp.finance.qq.com/mstats/#mod=list&id=hs_hsj&module=hs&type=hsj
+https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=priceRatio&direct=down&offset=20&count=20
+无法获取开盘价最高价最低价等信息
 """
 
 class Tencent(requestbase):
@@ -38,6 +43,14 @@ class Tencent(requestbase):
     @property
     def dklineapi(self):
         return "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=&param=%s,%s,,,%d,%s"
+
+    @property
+    def stocklistapi(self):
+        return "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=%s&sort_type=priceRatio&direct=down&offset=%d&count=%d"
+
+    @property
+    def count_per_page(self):
+        return 200
 
     def _get_headers(self):
         headers = super()._get_headers()
@@ -139,7 +152,7 @@ class Tencent(requestbase):
             code = s_code if s_code in codes else s_code[2:] if s_code[2:] in codes else s_code
             stock_dict[code] = self.parse_quote(stock)
         return stock_dict
-    
+
     def get_tline_url(self, stock):
         return self.tlineapi % stock, self._get_headers()
 
@@ -196,3 +209,23 @@ class Tencent(requestbase):
 
         return result
 
+    def get_stock_list_url(self, page = 1, market = 'all'):
+        offset = (page - 1) * self.count_per_page
+        market = {'all': 'aStock', 'cyb': 'cyb', 'kcb':'ksh'}[market]
+        return self.stocklistapi % (market, offset, self.count_per_page), self._get_headers()
+
+    def parse_totalcount(self, rep_data):
+        return json.loads(rep_data)['data']['total']
+
+    def parse_stock_list(self, rep_data):
+        data = json.loads(rep_data)['data']['rank_list']
+        return [{
+            'code': stock['code'],
+            'name': stock['name'],
+            'close': float(stock['zxj']),
+            'lclose': float(stock['zxj']) - float(stock['zd']),
+            'change_px': float(stock['zd']),
+            'change': float(stock['zdf']) / 100,
+            'volume': int(float(stock['volume']) * 100),
+            'amount': float(stock['turnover']) * 10000,
+        } for stock in data]
