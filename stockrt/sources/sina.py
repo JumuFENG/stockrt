@@ -195,5 +195,5 @@ class Sina(requestbase):
         } for stock in data]
 
     def stock_list_for_market(self, market: str = 'all'):
-        pages = [i for i in range(1, self.get_market_stock_count(market) // self.count_per_page + 2)]
+        pages = [i for i in range(1, self.get_market_stock_count(market) // self.stocklist_page_size + 2)]
         return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})

@@ -37,6 +37,7 @@ https://x-quote.cls.cn/web_quote/web_stock/stock_list?app=CailianpressWeb&market
 
 class CailianShe(requestbase):
     clsbase_param = 'app=CailianpressWeb&os=web&sv=8.4.6'
+    stocklist_page_size = 30
     @property
     def qtapi(self):
         return (
@@ -66,10 +67,6 @@ class CailianShe(requestbase):
         return (
             "https://x-quote.cls.cn/web_quote/web_stock/stock_list?%s&market=%s&page=%d&rever=1&types=%s"
         )
-
-    @property
-    def count_per_page(self):
-        return 30
 
     def get_secucode(self, stock):
         fcode = self.get_fullcode(stock)
@@ -241,5 +238,5 @@ class CailianShe(requestbase):
         } for stock in data]
 
     def stock_list_for_market(self, market: str = 'all'):
-        pages = [self.get_market_stock_count(market) // self.count_per_page + 1]
+        pages = [self.get_market_stock_count(market) // self.stocklist_page_size + 1]
         return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})

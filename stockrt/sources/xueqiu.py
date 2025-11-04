@@ -190,10 +190,11 @@ class Xueqiu(requestbase):
 
     def get_stock_list_url(self, page = 1, market = 'all'):
         market = {'all': '', 'sha': 'sha', 'kcb': 'kcb', 'sza': 'sza', 'cyb': 'cyb'}.get(market, '')
-        return self.stocklistapi % (page, self.count_per_page, market), self._get_headers()
+        return self.stocklistapi % (page, self.stocklist_page_size, market), self._get_headers()
 
-    def parse_totalcount(self, rep_data):
-        return json.loads(rep_data)['data']['count']
+    def get_total_count(self, rep_data):
+        data = json.loads(rep_data)['data']
+        return data['count'], len(data['list'])
 
     def parse_stock_list(self, rep_data):
         data = json.loads(rep_data)['data']['list']

@@ -26,6 +26,7 @@ https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.
 
 class Tencent(requestbase):
     quote_max_num = 60
+    stocklist_page_size = 200
     grep_stock_code = re.compile(r"(?<=_)\w+")
 
     @property
@@ -47,10 +48,6 @@ class Tencent(requestbase):
     @property
     def stocklistapi(self):
         return "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=%s&sort_type=priceRatio&direct=down&offset=%d&count=%d"
-
-    @property
-    def count_per_page(self):
-        return 200
 
     def _get_headers(self):
         headers = super()._get_headers()
@@ -210,12 +207,13 @@ class Tencent(requestbase):
         return result
 
     def get_stock_list_url(self, page = 1, market = 'all'):
-        offset = (page - 1) * self.count_per_page
+        offset = (page - 1) * self.stocklist_page_size
         market = {'all': 'aStock', 'cyb': 'cyb', 'kcb':'ksh'}[market]
-        return self.stocklistapi % (market, offset, self.count_per_page), self._get_headers()
+        return self.stocklistapi % (market, offset, self.stocklist_page_size), self._get_headers()
 
-    def parse_totalcount(self, rep_data):
-        return json.loads(rep_data)['data']['total']
+    def get_total_count(self, rep_data):
+        data = json.loads(rep_data)['data']
+        return data['total'], len(data['rank_list'])
 
     def parse_stock_list(self, rep_data):
         data = json.loads(rep_data)['data']['rank_list']

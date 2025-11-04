@@ -42,6 +42,7 @@ def get_array_format():
 class rtbase(abc.ABC):
     # 每次请求的最大股票数
     quote_max_num = 800
+    stocklist_page_size = 100
 
     @staticmethod
     def get_fullcode(stock_code):
@@ -232,10 +233,6 @@ class requestbase(rtbase):
     def session(self):
         return requests.session()
 
-    @property
-    def count_per_page(self):
-        return 100
-
     @abc.abstractmethod
     def get_quote_url(self, stocks):
         pass
@@ -322,8 +319,11 @@ class requestbase(rtbase):
     def parse_stock_list(self, rep_data):
         return []
 
-    def parse_totalcount(self, rep_data):
-        return 0
+    def get_total_count(self, rep_data):
+        '''
+        :return: 总数，每页数
+        '''
+        return 0, 100
 
     def format_stock_list_response(self, rep_data, market='all'):
         result = {}
@@ -382,16 +382,16 @@ class requestbase(rtbase):
         response = self.session.get(url)
         response.raise_for_status()
         stocks = self.parse_stock_list(response.text)
-        total_count = self.parse_totalcount(response.text)
-        return stocks, total_count
+        total, count = self.get_total_count(response.text)
+        return stocks, total, count
 
     def stock_list_for_market(self, market: str = 'all') -> Dict[str, Any]:
-        stocks_1, total_count = self.first_page_with_totalcount(market)
-        if total_count <= len(stocks_1):
+        stocks_1, total, count_1 = self.first_page_with_totalcount(market)
+        if total <= len(stocks_1):
             return {market: stocks_1}
-        if len(stocks_1) < self.count_per_page:
-            self.count_per_page = len(stocks_1)
-        pages = [i for i in range(2, total_count // self.count_per_page + 2)]
+        if count_1 < self.stocklist_page_size:
+            self.stocklist_page_size = count_1
+        pages = [i for i in range(2, total // self.stocklist_page_size + 2)]
         stocks = self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})
         return {market: stocks_1 + stocks[market]}
 

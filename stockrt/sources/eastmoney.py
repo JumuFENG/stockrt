@@ -324,15 +324,16 @@ class EastMoney(requestbase):
             'cyb': 'm:0+t:80+f:!2',
             'bjs': 'm:0+t:81+s:262144+f:!2',
         }
-        url = self.stocklistapi % (fs[market], page, self.count_per_page, int(time.time()*1000))
+        url = self.stocklistapi % (fs[market], page, self.stocklist_page_size, int(time.time()*1000))
         headers = {
             **self._get_headers(),
             'Cookie': self.get_em_cookie(),
         }
         return url, headers
     
-    def parse_totalcount(self, rep_data):
-        return json.loads(rep_data)['data']['total']
+    def get_total_count(self, rep_data):
+        data = json.loads(rep_data)['data']
+        return data['total'], len(data['diff'])
 
     def parse_stock_list(self, rep_data):
         data = json.loads(rep_data)['data']['diff']
