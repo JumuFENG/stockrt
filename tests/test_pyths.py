@@ -54,7 +54,7 @@ class TestThsFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_list_of_stock_codes_mklines(self):
-        stock_codes = ['000001', 'sh000001']
+        stock_codes = ['000001', 'sh000001', '601398']
         result = self.source.mklines(stock_codes, 5, 10)
         self.assertIsInstance(result, dict)
 
