@@ -16,6 +16,7 @@ from functools import cached_property
 
 
 logger: logging.Logger = logging.getLogger('stockrt')
+_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0'
 
 
 _DEFAULT_ARRAY_FORMAT = 'list'
@@ -48,7 +49,7 @@ class rtbase(abc.ABC):
     def get_fullcode(stock_code):
         """判断股票ID对应的证券市场
         匹配规则
-        ["4", "8", "92"] 为 bj
+        ["43", "83", "87", "92"] 为 bj
         ['5', '6', '7', '9', '110', '113', '118', '132', '204'] 为 sh
         其余为 sz
 
@@ -64,7 +65,7 @@ class rtbase(abc.ABC):
             return stock_code
 
         assert len(stock_code) == 6, "stock code length should be 6"
-        bj_head = ("43", "81", "83", "87", "92")
+        bj_head = ("43", "83", "87", "92")
         sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
         if stock_code.startswith(bj_head):
             return f"bj{stock_code}"
@@ -229,6 +230,7 @@ class rtbase(abc.ABC):
 
 
 class requestbase(rtbase):
+    user_agent = _USER_AGENT
     @cached_property
     def session(self):
         return requests.session()
@@ -258,7 +260,7 @@ class requestbase(rtbase):
     def _get_headers(self):
         return {
             "Accept-Encoding": "gzip, deflate, sdch",
-            "User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0',
+            "User-Agent": self.user_agent,
             'Connection': 'keep-alive',
         }
 

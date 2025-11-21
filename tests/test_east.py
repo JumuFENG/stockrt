@@ -2,7 +2,7 @@ import unittest
 import time
 from stockrt import rtsource
 from unittest.mock import patch
-from stockrt.sources.eastmoney import EmCookie
+from stockrt.sources.eastmoney import Em
 
 
 class TestEmFunctions(unittest.TestCase):
@@ -55,7 +55,7 @@ class TestEmFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_single_stock_dklines(self):
-        stock_codes = '000001'
+        stock_codes = '603122'
         result = self.source.dklines(stock_codes, 'd', 10)
         self.assertIsInstance(result, dict)
 
@@ -98,39 +98,39 @@ class TestEmCookie(unittest.TestCase):
             {'cookie': 'cookie2', 'timestamp': time.time() - 600, 'used': 0, 'total_used': 0},
             {'cookie': 'cookie3', 'timestamp': time.time() - 600, 'used': 0, 'total_used': 0},
         ]
-        EmCookie.cookies = cls.cookie_data
+        Em.cookies = cls.cookie_data
 
     @classmethod
     def tearDownClass(cls):
-        EmCookie.cookies = []
+        Em.cookies = []
 
     def test_get_cookie_with_available_cookie(self):
-        cookie = EmCookie.get_cookie()
-        self.assertIn(cookie, [c['cookie'] for c in EmCookie.cookies])
-        self.assertEqual(cookie, EmCookie.cookies[0]['cookie'])
+        cookie = Em.get_cookie()
+        self.assertIn(cookie, [c['cookie'] for c in Em.cookies])
+        self.assertEqual(cookie, Em.cookies[0]['cookie'])
 
     @patch('stockrt.sources.eastmoney.EmCookie.generate_cookie', return_value='new_cookie')
     def test_get_cookie_with_no_available_cookie(self, mock_generate):
-        for cookie in EmCookie.cookies:
+        for cookie in Em.cookies:
             cookie['timestamp'] = time.time()
             cookie['used'] = 500
-        cookie = EmCookie.get_cookie()
-        self.assertIn(cookie, [c['cookie'] for c in EmCookie.cookies])
-        self.assertEqual(cookie, EmCookie.cookies[-1]['cookie'])
+        cookie = Em.get_cookie()
+        self.assertIn(cookie, [c['cookie'] for c in Em.cookies])
+        self.assertEqual(cookie, Em.cookies[-1]['cookie'])
 
     def test_get_cookie_with_expired_cookie(self):
-        EmCookie.cookies = [c for c in EmCookie.cookies if c['used'] < 499]
-        for cookie in EmCookie.cookies:
+        Em.cookies = [c for c in Em.cookies if c['used'] < 499]
+        for cookie in Em.cookies:
             cookie['timestamp'] = time.time() - 600
             cookie['used'] = 0
-        cookie = EmCookie.get_cookie()
-        self.assertIn(cookie, [c['cookie'] for c in EmCookie.cookies])
+        cookie = Em.get_cookie()
+        self.assertIn(cookie, [c['cookie'] for c in Em.cookies])
 
     def test_cookie_usage_increment(self):
-        initial_used_counts = [c['used'] for c in EmCookie.cookies]
-        initial_total_used_counts = [c['total_used'] for c in EmCookie.cookies]
-        cookie = EmCookie.get_cookie()
-        for i, c in enumerate(EmCookie.cookies):
+        initial_used_counts = [c['used'] for c in Em.cookies]
+        initial_total_used_counts = [c['total_used'] for c in Em.cookies]
+        cookie = Em.get_cookie()
+        for i, c in enumerate(Em.cookies):
             if c['cookie'] == cookie:
                 self.assertEqual(c['used'], initial_used_counts[i] + 1)
                 self.assertEqual(c['total_used'], initial_total_used_counts[i] + 1)
@@ -139,16 +139,15 @@ class TestEmCookie(unittest.TestCase):
 
     @patch('stockrt.sources.eastmoney.EmCookie.generate_cookie', return_value='new_cookie')
     def test_cookie_total_usage_overload(self, mock_generate):
-        for cookie in EmCookie.cookies:
+        for cookie in Em.cookies:
             cookie['total_used'] = 50000
-        old_cookies = [c['cookie'] for c in EmCookie.cookies]
-        cookie = EmCookie.get_cookie()
+        old_cookies = [c['cookie'] for c in Em.cookies]
+        cookie = Em.get_cookie()
         self.assertNotIn(cookie, old_cookies)
 
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestEmFunctions('test_get_stock_list'))
+    suite.addTest(TestEmFunctions('test_single_stock_dklines'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()
-    # print(kl)

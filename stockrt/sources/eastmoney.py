@@ -5,8 +5,11 @@ import hashlib
 import time
 import json
 import requests
+import random
+import traceback
 from functools import lru_cache
-from .rtbase import requestbase
+from .rtbase import requestbase, _USER_AGENT, logger
+
 
 '''
 quotes:
@@ -36,8 +39,16 @@ https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&cb=&fs=m:0+t:6+f
 请求限制: 1000/5min 50000/24h
 '''
 
-class EmCookie:
+class Em:
+    user_agent = _USER_AGENT
     cookies = []
+    max_used = 10
+    session = requests.session()
+    @classmethod
+    @lru_cache(maxsize=1)
+    def host(cls):
+        return f"{random.choice(['','48.','2.','7.','36.','76.'])}push2.eastmoney.com"
+
     @classmethod
     def get_cookie(cls):
         # 50000/24h, 500/5min (这里减半)
@@ -46,7 +57,7 @@ class EmCookie:
             if time.time() - cookie['timestamp'] > 300:
                 cookie['timestamp'] = time.time()
                 cookie['used'] = 0
-        cookie = next((c for c in cls.cookies if c['used'] < 500), None)
+        cookie = next((c for c in cls.cookies if c['used'] < cls.max_used), None)
         if not cookie:
             cookie = {
                 'cookie': cls.generate_cookie(),
@@ -73,12 +84,11 @@ class EmCookie:
             return s + hash_val[:4]
 
         url = 'https://anonflow2.eastmoney.com/backend/api/webreport'
-        useragent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0'
         payload = {
             "osPlatform":"MacOS","sourceType":"WEB","osversion":"Mac OS X 10","language":"en-US","timezone":"Asia/Shanghai",
             "webDeviceInfo":{
                 "screenResolution": "1600X900",
-                "userAgent": useragent,
+                "userAgent": cls.user_agent,
                 "canvasKey": hashlib.md5(random_string().encode()).hexdigest(),
                 "webglKey": hashlib.md5(random_string().encode()).hexdigest(),
                 "fontKey": hashlib.md5(random_string().encode()).hexdigest(),
@@ -87,12 +97,148 @@ class EmCookie:
         }
         headers = {
             'Host': 'anonflow2.eastmoney.com',
-            'User-Agent': useragent,
+            'User-Agent': cls.user_agent,
             'Cookie': f'st_nvi={random_string()}'
         }
-        response = requests.post(url, json=payload, headers=headers)
+        response = cls.session.post(url, json=payload, headers=headers)
         response.raise_for_status()
         return '; '.join([f'{k}={v}' for k,v in response.json()['data'].items()])
+
+    @classmethod
+    def set_over_used(cls, cookie):
+        c = next(c for c in cls.cookies if c['cookie'] == cookie)
+        if c:
+            c['used'] = cls.max_used
+
+    @classmethod
+    def qt_clist(cls, fs, fields=None, fid=None, po=1, qtcb=None):
+        """
+        Get stock list from eastmoney.
+
+        Parameters
+        ----------
+        fs : str
+            筛选条件.
+        fields : str
+            要获取的字段列表.
+        fid : str
+            排序的Field.
+        po : int
+            排序方式，1表示按照降序。
+        qtcb : callable
+            Callback function to stop loop.
+
+        Returns
+        -------
+        data : list
+            List of stock data.
+        """
+        pgsize = 100
+        if fs is None:
+            fs = 'm:0+t:6+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:262144+f:!2'
+        if fields is None:
+            fields = 'f12,f13,f14,f21,f26'
+        if fid is None:
+            fid = 'f3'
+        pn = 1
+        ufmt = ('http://' + cls.host() + '/api/qt/clist/get?pn=%d&pz=%d&po=%d&np=1'
+            '&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=%s&fs=%s&fields=%s&_=%d')
+        headers = {
+            'User-Agent': cls.user_agent,
+            'Cookie': cls.get_cookie(),
+            'Host': cls.host()
+        }
+        data = []
+        retry = 0
+        while True:
+            try:
+                url = ufmt % (pn, pgsize, po, fid, fs, fields, int(time.time()*1000))
+                headers['Cookie'] = cls.get_cookie()
+                resp = cls.session.get(url, headers=headers)
+                resp.raise_for_status()
+                jdata = resp.json()
+                if 'data' not in jdata or 'diff' not in jdata['data']:
+                    break
+                data.extend(jdata['data']['diff'])
+                total = jdata['data']['total']
+                if len(data) >= total:
+                    break
+                if callable(qtcb) and qtcb(jdata['data']['diff']):
+                    break
+                if pn > 1 and len(jdata['data']['diff']) < pgsize:
+                    break
+                if pn == 1 and len(jdata['data']['diff']) < pgsize:
+                    pgsize = len(jdata['data']['diff'])
+                pn += 1
+            except requests.exceptions.ConnectionError as ce:
+                cls.set_over_used(headers['Cookie'])
+                retry += 1
+                if retry % 3 == 0:
+                    cls.host.cache_clear()
+                if retry > 10:
+                    logger.error(f'ConnectionError: {ce} {url}')
+                    break
+                continue
+            except Exception as e:
+                logger.error(e)
+                logger.debug(traceback.format_exc())
+                break
+
+        return data
+
+    @classmethod
+    def convert_fields(cls, data):
+        field_map = {
+            'f12': 'code',
+            'f13': 'market',
+            'f14': 'name',
+            'f2': 'close',
+            'f3': 'change',
+            'f4': 'change_px',
+            'f5': 'volume',
+            'f6': 'amount',
+            'f7': 'amplitude',
+            'f8': 'turnover', #换手
+            # 'f9': '', #动态市盈率
+            # 'f10': '', #量比
+            'f15': 'high',
+            'f16': 'low',
+            'f17': 'open',
+            'f18': 'lclose',
+            'f20': 'mc', # 市值
+            'f21': 'cmc', # 流通市值
+            'f26': 'setup_date',
+            'f62': 'main',
+            'f184': 'mainp',
+            'f84': 'small',
+            'f78': 'middle',
+            'f72': 'big',
+            'f66': 'super',
+            'f87': 'smallp',
+            'f81': 'midllep',
+            'f75': 'bigp',
+            'f69': 'superp',
+        }
+        def convert(k, v):
+            named_key = field_map.get(k, k)
+            if named_key in (k, 'market', 'name'):
+                return v
+            if named_key == 'code':
+                return requestbase.get_fullcode(v)
+            if named_key in ('setup_date',):
+                return str(v)
+            if v == '-':
+                return 0
+            v = float(v)
+            if named_key in ('change', 'turnover', 'amplitude'):
+                return v / 100
+            if named_key in ('volume',):
+                return int(v * 100)
+            return v
+
+        if isinstance(data, list):
+            return [{ field_map.get(k, k): convert(k, v) for k, v in d.items() } for d in data]
+        return { field_map.get(k, k): convert(k, v) for k, v in data.items() }
 
 
 class EastMoney(requestbase):
@@ -147,7 +293,7 @@ class EastMoney(requestbase):
 
     @staticmethod
     def get_em_cookie():
-        return EmCookie.get_cookie()
+        return Em.get_cookie()
 
     @classmethod
     def secid_to_fullcode(cls, sec):
@@ -330,7 +476,7 @@ class EastMoney(requestbase):
             'Cookie': self.get_em_cookie(),
         }
         return url, headers
-    
+
     def get_total_count(self, rep_data):
         data = json.loads(rep_data)['data']
         return data['total'], len(data['diff'])
