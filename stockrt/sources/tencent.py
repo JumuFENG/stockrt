@@ -118,12 +118,12 @@ class Tencent(requestbase):
             # "价格/成交量(手)/成交额": stock[35],
             "volume": int(stock[36]) * 100,
             "amount": float(stock[37]) * 10000,
-            "turnover": self._safe_price(stock[38]),
+            "turnover": self._safe_price(stock[38])/100,
             "PE": self._safe_price(stock[39]),
             # "unknown": stock[40],
             # "high_2": float(stock[41]),  # 意义不明
             # "low_2": float(stock[42]),  # 意义不明
-            "振幅": float(stock[43]),
+            "amplitude": float(stock[43])/100,
             "cmc": self._safe_price(stock[44]) * 1e8, # 流通市值
             "mc": self._safe_price(stock[45]) * 1e8, # 总市值
             "PB": float(stock[46]),

@@ -91,7 +91,7 @@ class Sina(requestbase):
             stock = stock_match_object.groups()
             code = stock[0] if stock[0] in codes else stock[0][2:] if stock[0][2:] in codes else stock[0]
             price = float(stock[4])
-            if (price == 0 or float(stock[2])) and stock[12] == stock[22]:
+            if (price == 0 or float(stock[2]) == 0) and (float(stock[12]) > 0 and stock[12] == stock[22]):
                 # 如果价格为0，或者开盘价为0，买1价等于卖1价，是集合竞价
                 price = float(stock[12])
             stock_dict[code] = dict(

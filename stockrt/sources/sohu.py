@@ -132,6 +132,7 @@ class Sohu(requestbase):
             result[code] = {
                 # 'wb': self._safe_price(q[0].strip('%'))/100, # 委比
                 # 'wr': q[1], # 委差
+                'price': float(data['price_A1'][2]),
                 'ask5': float(q[2]), 'ask5_volume': int(q[3]) * 100,
                 'ask4': float(q[4]), 'ask4_volume': int(q[5]) * 100,
                 'ask3': float(q[6]), 'ask3_volume': int(q[7]) * 100,
@@ -148,6 +149,8 @@ class Sohu(requestbase):
         return result
 
     def get_tline_url(self, stock):
+        if stock.startswith(('sh00', 'sz399')):
+            return None, None
         cncode = self.get_cncode(stock)
         return self.tlineapi % (cncode[-3:], cncode), self._get_headers()
 
@@ -174,6 +177,8 @@ class Sohu(requestbase):
         klt = self.to_int_kltype(kltype)
         if klt not in [101, 102, 103]:  # 101: 日K, 102: 周K, 103: 月K
             raise ValueError("Invalid kltype for Sohu DKLine API")
+        if stock.startswith(('sh00', 'sz399')):
+            return None, None
         cncode = self.get_cncode(stock)
         klt -= 91
         return self.dklineapi % (cncode[-3:], cncode, klt), self._get_headers()

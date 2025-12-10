@@ -73,7 +73,7 @@ class Taogb(requestbase):
                     'lclose': float(item.get('closePrice', 0)),
                     'high': float(item.get('highPrice', 0)),
                     'low': float(item.get('lowPrice', 0)),
-                    'volume': float(item.get('volumn', 0)),
+                    'volume': float(item.get('volumn', 0)) * 100 if fcode.startswith(('sh00', 'sz399')) else float(item.get('volumn', 0)),
                     'amount': float(item.get('volumnPrice', 0)),
                     'date': item.get('lastDate'),
                     'time': item.get('lastTime'),
@@ -111,16 +111,16 @@ class Taogb(requestbase):
                 'low': float(dto.get('lowPrice', 0)),
                 'volume': float(dto.get('volumn', 0)),
                 'amount': float(dto.get('volumnPrice', 0)),
-                'ask1': float(dto.get('sell_1', 0)), 'ask1_volume': int(dto.get('sell_1_s', 0)),
-                'ask2': float(dto.get('sell_2', 0)), 'ask2_volume': int(dto.get('sell_2_s', 0)),
-                'ask3': float(dto.get('sell_3', 0)), 'ask3_volume': int(dto.get('sell_3_s', 0)),
-                'ask4': float(dto.get('sell_4', 0)), 'ask4_volume': int(dto.get('sell_4_s', 0)),
-                'ask5': float(dto.get('sell_5', 0)), 'ask5_volume': int(dto.get('sell_5_s', 0)),
-                'bid1': float(dto.get('buy_1', 0)), 'bid1_volume': int(dto.get('buy_1_s', 0)),
-                'bid2': float(dto.get('buy_2', 0)), 'bid2_volume': int(dto.get('buy_2_s', 0)),
-                'bid3': float(dto.get('buy_3', 0)), 'bid3_volume': int(dto.get('buy_3_s', 0)),
-                'bid4': float(dto.get('buy_4', 0)), 'bid4_volume': int(dto.get('buy_4_s', 0)),
-                'bid5': float(dto.get('buy_5', 0)), 'bid5_volume': int(dto.get('buy_5_s', 0)),
+                'ask1': float(dto.get('sell_1', 0)), 'ask1_volume': int(dto.get('sell_1_s', 0))/100,
+                'ask2': float(dto.get('sell_2', 0)), 'ask2_volume': int(dto.get('sell_2_s', 0))/100,
+                'ask3': float(dto.get('sell_3', 0)), 'ask3_volume': int(dto.get('sell_3_s', 0))/100,
+                'ask4': float(dto.get('sell_4', 0)), 'ask4_volume': int(dto.get('sell_4_s', 0))/100,
+                'ask5': float(dto.get('sell_5', 0)), 'ask5_volume': int(dto.get('sell_5_s', 0))/100,
+                'bid1': float(dto.get('buy_1', 0)), 'bid1_volume': int(dto.get('buy_1_s', 0))/100,
+                'bid2': float(dto.get('buy_2', 0)), 'bid2_volume': int(dto.get('buy_2_s', 0))/100,
+                'bid3': float(dto.get('buy_3', 0)), 'bid3_volume': int(dto.get('buy_3_s', 0))/100,
+                'bid4': float(dto.get('buy_4', 0)), 'bid4_volume': int(dto.get('buy_4_s', 0))/100,
+                'bid5': float(dto.get('buy_5', 0)), 'bid5_volume': int(dto.get('buy_5_s', 0))/100,
                 'date': dto.get('lastDate'),
                 'time': dto.get('lastTime'),
                 'change': float(dto.get('pxChangeRate', 0)) / 100,
@@ -147,7 +147,7 @@ class Taogb(requestbase):
                 tline.append([
                     parts[0],                # time
                     float(parts[1]),         # price
-                    float(parts[2]),         # volume
+                    float(parts[2]) * 100 if c.startswith(('sh00', 'sz399')) else float(parts[2]), # volume
                     float(parts[3]),         # amount
                 ])
             result[c] = self.format_array_list(tline, ['time', 'price', 'volume', 'amount'])
@@ -183,7 +183,7 @@ class Taogb(requestbase):
                     float(parts[3]),                 # close
                     float(parts[4]),                 # high
                     float(parts[5]),                 # low
-                    int(float(parts[6])*100),        # volume
+                    int(float(parts[6])*10000) if c.startswith(('sh00', 'sz399')) else int(float(parts[6])*100), # volume
                     float(parts[7]),                 # amount
                     (float(parts[3]) - float(parts[1])) / float(parts[1]) if float(parts[1]) != 0 else 0,  # change
                     float(parts[3]) - float(parts[1]),  # change_px

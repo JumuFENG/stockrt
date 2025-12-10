@@ -149,7 +149,7 @@ class CailianShe(requestbase):
                     'change_px': float(data[stock]['change_px']),
                     'bottom_price': float(data[stock]['down_price']),
                     'top_price': float(data[stock]['up_price']),
-                    'cmc': float(data[stock]['cmc']),
+                    'cmc': 0 if data[stock]['cmc'] is None else float(data[stock]['cmc']),
                     'avg_price': data[stock]['av_px'],
                     'trade_status': data[stock]['trade_status'],
                     'secu_type': data[stock]['secu_type'],
@@ -190,7 +190,7 @@ class CailianShe(requestbase):
                 code = fcode if fcode in codes else fcode[-6:] if fcode[-6:] in codes else fcode
                 tline = []
                 for item in data[stock]['line']:
-                    tline.append([f'{str(item["minute"]//100).ljust(2, "0")}:{item["minute"]%100}', item['last_px'], item['change']])
+                    tline.append([f'{str(item["minute"]//100).ljust(2, "0")}:{str(item["minute"]%100).ljust(2, "0")}', item['last_px'], item['change']])
                 result[code] = self.format_array_list(tline, ['time', 'price', 'change'])
         return result
 

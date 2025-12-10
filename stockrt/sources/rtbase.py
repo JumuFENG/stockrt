@@ -196,7 +196,9 @@ class rtbase(abc.ABC):
         elif fmt == 'pd' or fmt == 'df':
             return pd.DataFrame(tlines, columns=cols)
         elif fmt == 'np':
-            return np.array(tlines)
+            dtdict = {'time': 'U20','volume': 'int64'}
+            dtypes = [(col, dtdict.get(col, 'float64')) for col in cols]
+            return np.array([tuple(row) for row in tlines], dtype=dtypes)
 
     @abc.abstractmethod
     def mklines(self, stocks, kltype, length=320, fq=0, withqt=False):
@@ -279,6 +281,9 @@ class requestbase(rtbase):
             else:
                 fcode = stock
             url, headers = url_func(fcode, **url_kwargs)
+            if url is None:
+                return None
+
             try:
                 if headers:
                     self.session.headers.update(headers)
@@ -293,7 +298,9 @@ class requestbase(rtbase):
         try:
             if len(stocks) <= 3:
                 for stock in stocks:
-                    results.append(fetch_single(stock))
+                    data = fetch_single(stock)
+                    if data is not None:
+                        results.append(data)
             else:
                 with ThreadPoolExecutor(max_workers=10) as executor:
                     futures = {executor.submit(fetch_single, stock): stock for stock in stocks}
