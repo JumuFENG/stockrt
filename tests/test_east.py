@@ -109,7 +109,7 @@ class TestEmCookie(unittest.TestCase):
         self.assertIn(cookie, [c['cookie'] for c in Em.cookies])
         self.assertEqual(cookie, Em.cookies[0]['cookie'])
 
-    @patch('stockrt.sources.eastmoney.EmCookie.generate_cookie', return_value='new_cookie')
+    @patch('stockrt.sources.eastmoney.Em.generate_cookie', return_value='new_cookie')
     def test_get_cookie_with_no_available_cookie(self, mock_generate):
         for cookie in Em.cookies:
             cookie['timestamp'] = time.time()
@@ -137,7 +137,7 @@ class TestEmCookie(unittest.TestCase):
             else:
                 self.assertEqual(c['used'], initial_used_counts[i])
 
-    @patch('stockrt.sources.eastmoney.EmCookie.generate_cookie', return_value='new_cookie')
+    @patch('stockrt.sources.eastmoney.Em.generate_cookie', return_value='new_cookie')
     def test_cookie_total_usage_overload(self, mock_generate):
         for cookie in Em.cookies:
             cookie['total_used'] = 50000

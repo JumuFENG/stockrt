@@ -73,14 +73,15 @@ class CailianShe(requestbase):
         if fcode.startswith('sh') or fcode.startswith('sz'):
             return fcode
         if fcode.startswith('bj'):
-            return fcode + '.BJ'
+            return fcode[-6:] + '.BJ'
         raise ValueError(f"Unsupported stock code format: {stock}")
 
     def secu_to_fullcode(self, secu):
         if secu.startswith('sh') or secu.startswith('sz'):
             return secu
         if secu.endswith('.BJ'):
-            return 'bj' + secu.replace('.BJ', '')
+            secu = secu.replace('.BJ', '')
+            return secu if secu.startswith('bj') else 'bj' + secu
         raise ValueError(f"Unsupported security code format: {secu}")
 
     def _get_headers(self):

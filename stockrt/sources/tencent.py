@@ -116,7 +116,7 @@ class Tencent(requestbase):
             "high": float(stock[33]),
             "low": float(stock[34]),
             # "价格/成交量(手)/成交额": stock[35],
-            "volume": int(stock[36]) * 100,
+            "volume": int(stock[36]) if stock[2].startswith("68") else int(stock[36]) * 100,
             "amount": float(stock[37]) * 10000,
             "turnover": self._safe_price(stock[38])/100,
             "PE": self._safe_price(stock[39]),
@@ -162,7 +162,7 @@ class Tencent(requestbase):
             for d in data:
                 time, price, volume, amount = d.split()
                 time = time[0:2] + ':' + time[2:]
-                volume = int(volume) * 100
+                volume = int(volume) if c.startswith(('68', 'sh68')) else int(volume) * 100
                 amount = float(amount)
                 tlobjs.append([time, float(price), volume - prev_volume, amount - prev_amount])
                 prev_volume, prev_amount = volume, amount  # 更新前一个值
@@ -195,7 +195,7 @@ class Tencent(requestbase):
                 kl = kdata['data'][fcode][matched_key]
                 klines = [[
                     f'{x[0][0:4]}-{x[0][4:6]}-{x[0][6:8]} {x[0][8:10]}:{x[0][10:]}' if is_minute else x[0],
-                    float(x[1]), float(x[2]), float(x[3]), float(x[4]), int(float(x[5]) * 100),
+                    float(x[1]), float(x[2]), float(x[3]), float(x[4]), int(float(x[5]) if fcode.startswith(('68', 'sh68')) else float(x[5]) * 100),
                     float(x[2]) * int(float(x[5]) * 100)
                 ] for x in kl]
             klines = self.format_array_list(klines, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount'])

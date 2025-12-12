@@ -18,6 +18,15 @@ from functools import cached_property
 logger: logging.Logger = logging.getLogger('stockrt')
 _USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0'
 
+@lru_cache(maxsize=1)
+def get_session():
+    session = requests.session()
+    session.headers.update({
+        "Accept-Encoding": "gzip, deflate, sdch",
+        "User-Agent": _USER_AGENT,
+        'Connection': 'keep-alive',
+    })
+    return session
 
 _DEFAULT_ARRAY_FORMAT = 'list'
 def set_array_format(fmt:str):
@@ -232,10 +241,9 @@ class rtbase(abc.ABC):
 
 
 class requestbase(rtbase):
-    user_agent = _USER_AGENT
-    @cached_property
+    @property
     def session(self):
-        return requests.session()
+        return get_session()
 
     @abc.abstractmethod
     def get_quote_url(self, stocks):
@@ -260,11 +268,7 @@ class requestbase(rtbase):
         pass
 
     def _get_headers(self):
-        return {
-            "Accept-Encoding": "gzip, deflate, sdch",
-            "User-Agent": self.user_agent,
-            'Connection': 'keep-alive',
-        }
+        return {}
 
     def _fetch_concurrently(
         self, stocks, url_func: Callable, format_func: Callable,

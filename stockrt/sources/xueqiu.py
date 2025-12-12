@@ -138,7 +138,7 @@ class Xueqiu(requestbase):
             data = json.loads(v)['data']['items']
             tldata = [[datetime.fromtimestamp(d['timestamp'] / 1000).strftime('%H:%M'), d['current'], d['volume'], d['amount'], d['avg_price']] for d in data]
             for mt in ('09:30', '13:00'):
-                idmt = next(i for i, d in enumerate(tldata) if d[0].endswith(mt))
+                idmt = next((i for i, d in enumerate(tldata) if d[0].endswith(mt)), -1)
                 if idmt >= 0 and idmt + 1 < len(tldata):
                     tldata[idmt+1][2] += tldata[idmt][2]
                     tldata[idmt+1][3] += tldata[idmt][3]

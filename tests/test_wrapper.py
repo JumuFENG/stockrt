@@ -32,7 +32,7 @@ class TestSourcesDataMatch(unittest.TestCase):
     sources = [rtsource(k) for k in sourcekeys]
 
     def test_sources_quotes_match(self):
-        for code in ['sh000001', '000001']:
+        for code in ['sh000001', '000001', '688588', '300750', '920252']:
             quotes = {}
             for source_key, source in zip(self.sourcekeys, self.sources):
                 q = source.quotes(code)
@@ -77,7 +77,7 @@ class TestSourcesDataMatch(unittest.TestCase):
 
     def test_sources_tlines_match(self):
         set_array_format('dict')
-        for code in ['sh000001', '000001']:
+        for code in ['sh000001', '000001', '688588', '300750', '920252']:
             tlines = {}
             for source_key, source in zip(self.sourcekeys, self.sources):
                 tl = source.tlines(code)
@@ -93,7 +93,7 @@ class TestSourcesDataMatch(unittest.TestCase):
                 msgsrc = f'source = {source_key}'
                 self.assertEqual(time, squotes[-1]['time'], msg=msgsrc)
                 self.assertEqual(price, round(squotes[-1]['price'], 2), msg=msgsrc)
-                if source_key == 'cls':
+                if source_key in ('cls'):
                     continue
                 self.assertEqual(volume, round(squotes[-1]['volume'] / 100), msg=msgsrc)
                 if source_key == 'sina':
@@ -102,7 +102,7 @@ class TestSourcesDataMatch(unittest.TestCase):
 
     def test_sources_mklines_match(self):
         set_array_format('dict')
-        for code in ['000001']:#'sh000001', 
+        for code in ['000001', '688588', '300750', '920252']:#'sh000001', 
             mklines = {}
             for source_key, source in zip(self.sourcekeys, self.sources):
                 kl = source.mklines(code, 5, 48)
@@ -125,7 +125,7 @@ class TestSourcesDataMatch(unittest.TestCase):
 
     def test_sources_dklines_match(self):
         set_array_format('dict')
-        for code in ['sh000001', '000001']:
+        for code in ['sh000001', '000001', '688588', '300750', '920252']:#
             mklines = {}
             for source_key, source in zip(self.sourcekeys, self.sources):
                 kl = source.klines(code, 101, 10, fq=0)
@@ -143,6 +143,8 @@ class TestSourcesDataMatch(unittest.TestCase):
             volume = round(lastmkline['volume'] / 100)
             amount = round(lastmkline['amount'] / 1e6)
             for source_key, squotes in mklines.items():
+                # if source_key in ('em', 'sina', 'tgb', 'sohu'):
+                #     continue
                 msgsrc = f'source = {source_key}'
                 self.assertEqual(time, squotes[-1]['time'], msg=msgsrc)
                 self.assertEqual(open, round(squotes[-1]['open'], 2), msg=msgsrc)
@@ -160,5 +162,5 @@ class TestSourcesDataMatch(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
     # suite = unittest.TestSuite()
-    # suite.addTest(TestSourcesDataMatch('test_sources_tlines_match'))
+    # suite.addTest(TestSourcesDataMatch('test_sources_dklines_match'))
     # unittest.TextTestRunner().run(suite)

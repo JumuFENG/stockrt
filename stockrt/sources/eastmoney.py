@@ -8,7 +8,7 @@ import requests
 import random
 import traceback
 from functools import lru_cache
-from .rtbase import requestbase, _USER_AGENT, logger
+from .rtbase import get_session, requestbase, _USER_AGENT, logger
 
 
 '''
@@ -40,10 +40,8 @@ https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&cb=&fs=m:0+t:6+f
 '''
 
 class Em:
-    user_agent = _USER_AGENT
     cookies = []
     max_used = 10
-    session = requests.session()
     @classmethod
     @lru_cache(maxsize=1)
     def host(cls):
@@ -88,7 +86,7 @@ class Em:
             "osPlatform":"MacOS","sourceType":"WEB","osversion":"Mac OS X 10","language":"en-US","timezone":"Asia/Shanghai",
             "webDeviceInfo":{
                 "screenResolution": "1600X900",
-                "userAgent": cls.user_agent,
+                "userAgent": _USER_AGENT,
                 "canvasKey": hashlib.md5(random_string().encode()).hexdigest(),
                 "webglKey": hashlib.md5(random_string().encode()).hexdigest(),
                 "fontKey": hashlib.md5(random_string().encode()).hexdigest(),
@@ -97,10 +95,11 @@ class Em:
         }
         headers = {
             'Host': 'anonflow2.eastmoney.com',
-            'User-Agent': cls.user_agent,
+            'User-Agent': _USER_AGENT,
             'Cookie': f'st_nvi={random_string()}'
         }
-        response = cls.session.post(url, json=payload, headers=headers)
+        session = get_session()
+        response = session.post(url, json=payload, headers=headers)
         response.raise_for_status()
         return '; '.join([f'{k}={v}' for k,v in response.json()['data'].items()])
 
@@ -144,17 +143,18 @@ class Em:
         ufmt = ('http://' + cls.host() + '/api/qt/clist/get?pn=%d&pz=%d&po=%d&np=1'
             '&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=%s&fs=%s&fields=%s&_=%d')
         headers = {
-            'User-Agent': cls.user_agent,
+            'User-Agent': _USER_AGENT,
             'Cookie': cls.get_cookie(),
             'Host': cls.host()
         }
         data = []
         retry = 0
+        session = get_session()
         while True:
             try:
                 url = ufmt % (pn, pgsize, po, fid, fs, fields, int(time.time()*1000))
                 headers['Cookie'] = cls.get_cookie()
-                resp = cls.session.get(url, headers=headers)
+                resp = session.get(url, headers=headers)
                 resp.raise_for_status()
                 jdata = resp.json()
                 if 'data' not in jdata or 'diff' not in jdata['data']:
@@ -170,6 +170,7 @@ class Em:
                 if pn == 1 and len(jdata['data']['diff']) < pgsize:
                     pgsize = len(jdata['data']['diff'])
                 pn += 1
+                time.sleep(random.random()*random.choice([1, 2]))
             except requests.exceptions.ConnectionError as ce:
                 cls.set_over_used(headers['Cookie'])
                 retry += 1
@@ -461,7 +462,7 @@ class EastMoney(requestbase):
         }
         return url, headers
 
-    def get_stock_list_url(self, page = 1, market = 'all'):
+    def market_fs(self, market='all'):
         fs = {
             'all': 'm:0+t:6+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:262144+f:!2',
             'sha': 'm:1+t:2+f:!2,m:1+t:23+f:!2',
@@ -470,7 +471,10 @@ class EastMoney(requestbase):
             'cyb': 'm:0+t:80+f:!2',
             'bjs': 'm:0+t:81+s:262144+f:!2',
         }
-        url = self.stocklistapi % (fs[market], page, self.stocklist_page_size, int(time.time()*1000))
+        return fs[market]
+
+    def get_stock_list_url(self, page = 1, market = 'all'):
+        url = self.stocklistapi % (self.market_fs(market), page, self.stocklist_page_size, int(time.time()*1000))
         headers = {
             **self._get_headers(),
             'Cookie': self.get_em_cookie(),
@@ -483,6 +487,9 @@ class EastMoney(requestbase):
 
     def parse_stock_list(self, rep_data):
         data = json.loads(rep_data)['data']['diff']
+        return self.parse_stock_list_json(data)
+
+    def parse_stock_list_json(self, data):
         return [{
             'code': self.secid_to_fullcode(f"{stock['f13']}.{stock['f12']}"),
             'name': stock['f14'],
@@ -506,3 +513,8 @@ class EastMoney(requestbase):
             'bigp': float(stock['f75']),
             'superp': float(stock['f69']),
         } for stock in data if stock['f2'] != '-' and stock['f5'] != '-']
+
+    # def stock_list_for_market(self, market: str = 'all'):
+    #     fields = "f1,f2,f3,f4,f5,f6,f15,f16,f17,f18,f12,f13,f14,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f124"
+    #     clist = Em.qt_clist(self.market_fs(market), fields, 'f3')
+    #     return {market: self.parse_stock_list_json(clist)}
