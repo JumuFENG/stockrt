@@ -18,7 +18,7 @@ class TestSohuFunctions(unittest.TestCase):
             self.assertIsNotNone(stock_data[key])
 
     def test_list_of_stock_codes_quotes(self):
-        stock_codes = ['600030', '000001', '601398', '000002', '600519']
+        stock_codes = ['600030', '601398', '000002', '600519', 'sh000001', 'sz399001']
         result = self.source.quotes(stock_codes)
         self.assertIsInstance(result, dict)
 
@@ -43,7 +43,7 @@ class TestSohuFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_list_of_stock_codes_tlines(self):
-        stock_codes = ['600030', '000001']
+        stock_codes = ['600030', 'sh000001', 'sz399001']
         result = self.source.tlines(stock_codes)
         self.assertIsInstance(result, dict)
 
@@ -53,7 +53,7 @@ class TestSohuFunctions(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_list_of_stock_codes_mklines(self):
-        stock_codes = ['600030', '000001']
+        stock_codes = ['600030', 'sh000001', 'sz399001']
         result = self.source.mklines(stock_codes, 5, 10)
         self.assertIsNone(result)
 
@@ -63,13 +63,13 @@ class TestSohuFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_list_of_stock_codes_dklines(self):
-        stock_codes = ['600030', '000001']
+        stock_codes = ['600030', 'sh000001', 'sz399001']
         result = self.source.dklines(stock_codes, 'd', 10)
         self.assertIsInstance(result, dict)
 
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestSohuFunctions('test_single_stock_quotes'))
+    suite.addTest(TestSohuFunctions('test_list_of_stock_codes_quotes'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()

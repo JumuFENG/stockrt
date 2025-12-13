@@ -3,6 +3,7 @@ import re
 import ast
 import time
 import json
+from datetime import datetime
 from .rtbase import requestbase
 
 """
@@ -43,16 +44,15 @@ class Sohu(requestbase):
 
     @property
     def tlineapi(self):
-        return "https://hq.stock.sohu.com/cn/%s/%s-4.html"
+        return "https://hq.stock.sohu.com/%s/%s/%s-4.html"
 
     @property
     def mklineapi(self):
-        # return "https://hq.stock.sohu.com/cn/%s/%s-9_%dm.html"
-        pass
+        return "https://hq.stock.sohu.com/%s/%s/%s-9_%dm.html"
 
     @property
     def dklineapi(self):
-        return "https://hq.stock.sohu.com/mkline/cn/%s/%s-%s_2.html"
+        return "https://hq.stock.sohu.com/mkline/%s/%s/%s-%s_2.html"
 
     @property
     def fklineapi(self):
@@ -71,8 +71,24 @@ class Sohu(requestbase):
         fcode = self.get_fullcode(stock)
         return f'cn_{fcode[2:]}'
 
+    def get_zscode(self, stock):
+        if len(stock) == 6 and stock.isdigit():
+            return f'zs_{stock}'
+        fcode = self.get_fullcode(stock)
+        return f'zs_{fcode[2:]}'
+
+    def get_cnzs_code(self, stock):
+        if stock.startswith(('sh00', 'sz399')):
+            cnzs = 'zs'
+            cncode = self.get_zscode(stock)
+        else:
+            cnzs = 'cn'
+            cncode = self.get_cncode(stock)
+        return cnzs, cncode
+
     def get_quote_url(self, stocks):
-        return self.qtapi % ','.join([self.get_cncode(s) for s in stocks]), self._get_headers()
+        cncodes = [self.get_zscode(s) if s.startswith(('sh00', 'sz399')) else self.get_cncode(s) for s in stocks]
+        return self.qtapi % ','.join(cncodes), self._get_headers()
 
     def format_quote_response(self, rep_data):
         result = {}
@@ -105,6 +121,8 @@ class Sohu(requestbase):
         return result
 
     def get_quote5_url(self, stock):
+        if stock.startswith(('sh00', 'sz399')):
+            return None, None
         cncode = self.get_cncode(stock)
         return self.qt5api % (cncode[-3:], cncode), self._get_headers()
 
@@ -149,10 +167,8 @@ class Sohu(requestbase):
         return result
 
     def get_tline_url(self, stock):
-        if stock.startswith(('sh00', 'sz399')):
-            return None, None
-        cncode = self.get_cncode(stock)
-        return self.tlineapi % (cncode[-3:], cncode), self._get_headers()
+        cnzs, cncode = self.get_cnzs_code(stock)
+        return self.tlineapi % (cnzs, cncode[-3:], cncode), self._get_headers()
 
     def format_tline_response(self, rep_data):
         result = {}
@@ -161,54 +177,72 @@ class Sohu(requestbase):
             if not data:
                 continue
             tline = []
+            cols = ['time', 'price', 'volume', 'amount', 'avg_price']
+            if len(data[-1]) == 4:
+                cols = ['time', 'price', 'volume']
             for d in data[1:]:
-                tline.append([d[0], float(d[1]), int(d[3])*100, float(d[4])*10000, float(d[2])])
-            result[c] = self.format_array_list(tline, ['time', 'price', 'volume', 'amount', 'avg_price'])
+                if len(d) == 4:
+                    tline.append([d[0], float(d[1]), int(float(d[2])*100)])
+                else:
+                    tline.append([d[0], float(d[1]), int(d[3])*100, float(d[4])*10000, float(d[2])])
+            result[c] = self.format_array_list(tline, cols)
         return result
 
     def get_mkline_url(self, stock, kltype='5', length=320, fq=1):
         klt = self.to_int_kltype(kltype)
         if klt not in [5, 15, 30, 60]:
             raise ValueError("Invalid period for Sohu MKLine API")
-        cncode = self.get_cncode(stock)
-        return self.mklineapi % (cncode[-3:], cncode, klt), self._get_headers()
+        cnzs, cncode = self.get_cnzs_code(stock)
+        return self.mklineapi % (cnzs, cncode[-3:], cncode, klt), self._get_headers()
 
     def get_dkline_url(self, stock, kltype='101', length=320, fq=1):
         klt = self.to_int_kltype(kltype)
         if klt not in [101, 102, 103]:  # 101: 日K, 102: 周K, 103: 月K
             raise ValueError("Invalid kltype for Sohu DKLine API")
-        if stock.startswith(('sh00', 'sz399')):
-            return None, None
-        cncode = self.get_cncode(stock)
+        cnzs, cncode = self.get_cnzs_code(stock)
         klt -= 91
-        return self.dklineapi % (cncode[-3:], cncode, klt), self._get_headers()
+        return self.dklineapi % (cnzs, cncode[-3:], cncode, klt), self._get_headers()
 
     def get_fkline_url(self, stock, kltype='101', fq=0):
         return self.get_dkline_url(stock, kltype, fq=fq)
 
     def format_mkline_response(self, rep_data, fq=0, **kwargs):
         result = {}
+        year = str(datetime.now().year)[0:2]
         for c, v in rep_data:
             data = self.parse_jsonp(v)
             if not data:
                 continue
             karr = []
+            cols = ['time', 'open', 'close', 'high', 'low', 'volume', 'amount', 'change', 'change_px']
+            if len(data[0]) == 8:
+                cols = ['time', 'open', 'close', 'high', 'low', 'volume', 'change', 'change_px']
             for d in data:
-                date = d[0][0:4] + '-' + d[0][4:6] + '-' + d[0][6:8]
-                karr.append([
-                    date,  # date
-                    float(d[1]),  # open
-                    float(d[2]),  # close
-                    float(d[3]),  # high
-                    float(d[4]),  # low
-                    int(d[5])*100,    # volume
-                    float(d[6])*10000,  # amount
-                    float(d[9].strip('%')) / 100,  # change
-                    float(d[8]),  # change_px
-                ])
-            result[c] = self.format_array_list(
-                karr, ['time', 'open', 'close', 'high', 'low', 'volume', 'amount', 'change', 'change_px']
-            )
+                date = year + d[0][0:2] + '-' + d[0][2:4] + '-' + d[0][4:6] + ' ' + d[0][6:8] + ':' + d[0][8:10]
+                if 'amount' in cols:
+                    karr.append([
+                        date,  # date
+                        float(d[1]),  # open
+                        float(d[2]),  # close
+                        float(d[3]),  # high
+                        float(d[4]),  # low
+                        int(d[5])*100,    # volume
+                        float(d[6])*10000,  # amount
+                        float(d[8].strip('%')) / 100,  # change
+                        float(d[9]),  # change_px
+                    ])
+                else:
+                    karr.append([
+                        date,  # date
+                        float(d[1]),  # open
+                        float(d[2]),  # close
+                        float(d[3]),  # high
+                        float(d[4]),  # low
+                        int(d[5])*100,    # volume
+                        float(d[6].strip('%')) / 100,  # change
+                        float(d[7]),  # change_px
+                    ])
+            result[c] = self.format_array_list(karr, cols)
 
     def format_kline_response(self, rep_data, is_minute=False, fq=0, **kwargs):
         if is_minute:
