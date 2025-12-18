@@ -42,6 +42,7 @@ https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&cb=&fs=m:0+t:6+f
 class Em:
     cookies = []
     max_used = 10
+    session = get_session('em')
     @classmethod
     @lru_cache(maxsize=1)
     def host(cls):
@@ -95,11 +96,9 @@ class Em:
         }
         headers = {
             'Host': 'anonflow2.eastmoney.com',
-            'User-Agent': _USER_AGENT,
             'Cookie': f'st_nvi={random_string()}'
         }
-        session = get_session()
-        response = session.post(url, json=payload, headers=headers)
+        response = cls.session.post(url, json=payload, headers=headers)
         response.raise_for_status()
         return '; '.join([f'{k}={v}' for k,v in response.json()['data'].items()])
 
@@ -143,18 +142,16 @@ class Em:
         ufmt = ('http://' + cls.host() + '/api/qt/clist/get?pn=%d&pz=%d&po=%d&np=1'
             '&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=%s&fs=%s&fields=%s&_=%d')
         headers = {
-            'User-Agent': _USER_AGENT,
             'Cookie': cls.get_cookie(),
             'Host': cls.host()
         }
         data = []
         retry = 0
-        session = get_session()
         while True:
             try:
                 url = ufmt % (pn, pgsize, po, fid, fs, fields, int(time.time()*1000))
                 headers['Cookie'] = cls.get_cookie()
-                resp = session.get(url, headers=headers)
+                resp = cls.session.get(url, headers=headers)
                 resp.raise_for_status()
                 jdata = resp.json()
                 if 'data' not in jdata or 'diff' not in jdata['data']:
@@ -244,6 +241,10 @@ class Em:
 
 class EastMoney(requestbase):
     quote_max_num = 60
+    @property
+    def session(self):
+        return get_session('em')
+
     @property
     def qtapi(self):
         return (

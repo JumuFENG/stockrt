@@ -18,8 +18,8 @@ from functools import cached_property
 logger: logging.Logger = logging.getLogger('stockrt')
 _USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0'
 
-@lru_cache(maxsize=1)
-def get_session():
+@lru_cache(maxsize=16)
+def get_session(src):
     session = requests.session()
     session.headers.update({
         "Accept-Encoding": "gzip, deflate, sdch",
@@ -239,11 +239,14 @@ class rtbase(abc.ABC):
     def stock_list(self, market: str = 'all') -> Dict[str, Any]:
         pass
 
+    def transactions(self, stocks, date=None, start=''):
+        pass
+
 
 class requestbase(rtbase):
     @property
     def session(self):
-        return get_session()
+        return get_session(self.__class__.__name__)
 
     @abc.abstractmethod
     def get_quote_url(self, stocks):
@@ -289,9 +292,7 @@ class requestbase(rtbase):
                 return None
 
             try:
-                if headers:
-                    self.session.headers.update(headers)
-                data = self.session.get(url)
+                data = self.session.get(url, headers=headers)
                 if data and data.text:
                     return [stock, data.text]
             except Exception as e:

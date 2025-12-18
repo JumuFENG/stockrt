@@ -373,3 +373,59 @@ else:
 
         def stock_list(self, market = 'all'):
             pass
+
+        def format_transaction_response(self, rep_data, start=''):
+            cols = ['time', 'price', 'volume', 'amount', 'direction'] if rep_data and 'num' in rep_data[0] else ['time', 'price', 'volume', 'direction']
+            data = [[
+                tr['time'], tr['price'], tr['vol'], tr['num'], tr['buyorsell']
+            ] if 'num' in cols else [
+                tr['time'], tr['price'], tr['vol'], tr['buyorsell']
+            ] for tr in rep_data if tr['time'] >= start]
+            return self.format_array_list(data, cols)
+
+        def transactions(self, stocks, date=None, start=''):
+            if isinstance(stocks, str):
+                stocks = [stocks]
+            gsize = len(stocks) // len(self.tdxhosts) + 1
+            result = {}
+            wrappers = [c for c in self.clients if not c.busy]
+            with ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
+                futures = {
+                    executor.submit(
+                        self._get_transaction_for_group,
+                        wrappers[i],
+                        stocks[i*gsize:(i+1)*gsize],
+                        date,
+                        start
+                    ): i for i in range(len(wrappers))
+                }
+
+                for future in as_completed(futures):
+                    result.update(future.result())
+            return result
+
+        def _get_transaction_for_group(self, wclient, stocks, date=None, start=''):
+            """处理单个股票组的K线获取"""
+            group_result = {}
+            with wclient as client:  # 每个线程获取独立的client
+                for code in stocks:
+                    try:
+                        trans = []
+                        i = 0
+                        if date is not None:
+                            date = int(date.replace('-', ''))
+                        while True:
+                            if date is None:
+                                data = client.get_transaction_data(self.to_pytdx_market(code), code[-6:], i * 2000, 2000)
+                            else:
+                                data = client.get_history_transaction_data(self.to_pytdx_market(code), code[-6:], i * 2000, 2000, date)
+                            if not data:
+                                break
+                            trans = self.format_transaction_response(data, start) + trans
+                            if data[0]['time'] < start:
+                                break
+                            i += 1
+                        group_result[code] = trans
+                    except Exception as e:
+                        logger.error(f"Failed to get transaction for {code}: {str(e)}")
+            return group_result

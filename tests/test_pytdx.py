@@ -63,10 +63,20 @@ class TestTdxFunctions(unittest.TestCase):
         result = self.source.dklines(stock_codes, 'd', 10)
         self.assertIsInstance(result, dict)
 
+    def test_single_stock_transactions(self):
+        stock_codes = '000001'
+        result = self.source.transactions(stock_codes, None)
+        self.assertIsInstance(result, dict)
+
+    def test_single_stock_transaction_date(self):
+        stock_codes = '000001'
+        result = self.source.transactions(stock_codes, '2025-12-01')
+        self.assertIsInstance(result, dict)
+
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    # suite.addTest(TestTdxFunctions('test_list_of_stock_codes_mklines'))
-    suite.addTest(TestTdxFunctions('test_single_stock_dklines'))
+    suite.addTest(TestTdxFunctions('test_list_of_stock_codes_mklines'))
+    # suite.addTest(TestTdxFunctions('test_single_stock_transaction_date'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()

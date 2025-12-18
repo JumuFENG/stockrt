@@ -108,6 +108,7 @@ class FetchWrapper(object):
         'q_dklines': ['dklineapi', ('tencent',), False],
         'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],
         'stock_list': ['stocklistapi', ('eastmoney', 'sina', 'cls', 'tencent', 'xueqiu'), False],
+        'transactions': ['transactions', ('tdx', 'sina'), True],
     }
 
     @staticmethod
@@ -225,7 +226,7 @@ class FetchWrapper(object):
                     result.update(data)
             except Exception as e:
                 logger.warning(
-                    "Data source %s encountered an exception: %s", 
+                    "Data source %s encountered an exception: %s",
                     source, str(e)
                 )
                 self._handle_empty_result(source)
@@ -235,7 +236,7 @@ class FetchWrapper(object):
     def _fetch_from_source(self, source: str, stocks: List[str], *args, **kwargs) -> Dict[str, Any]:
         """
         Helper method to fetch data from a single source, used in parallel fetching.
-        
+
         :param source: Data source name
         :param stocks: List of stock codes to fetch from this source
         :return: Data dictionary
@@ -255,7 +256,7 @@ class FetchWrapper(object):
             return data
         except Exception as e:
             logger.warning(
-                "Data source %s encountered an exception in parallel fetch: %s", 
+                "Data source %s encountered an exception in parallel fetch: %s",
                 source, str(e)
             )
             logger.warning(traceback.format_exc())
@@ -383,10 +384,10 @@ def klines(stocks: Union[str, List[str]], kltype: Union[int,str]=1, length=320, 
             - 105/h/hy/hyear: 半年K线数据
             - 106/y/yr/year: 年K线数据
         length (int, optional): K线数据长度. Defaults to 320.
-        fq (int, optional): 是否复权. 
-            - 0: 不复权 
+        fq (int, optional): 是否复权.
+            - 0: 不复权
             - 1: 前复权 Default.
-            - 2: 后复权  
+            - 2: 后复权
 
     Returns:
         - Dict[str, Any]: {code1: [], code2: [] ...}
@@ -426,3 +427,16 @@ def stock_list(market: str = 'all') -> Dict[str, Any]:
     wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
     return wrapper.fetch(market)
 
+def transactions(stocks: Union[str, List[str]], date: str=None, start: str='') -> Dict[str, Any]:
+    '''获取指定日期的交易数据
+
+    Args:
+        stocks (Union[str, List[str]]): 股票代码或代码列表
+        date (str, optional): 日期. Defaults to None.
+        start (str, optional): 开始时间. Defaults to ''.
+
+    Returns:
+        - Dict[str, Any]: {code1: [], code2: [] ...}
+    '''
+    wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
+    return wrapper.fetch(stocks, date=date, start=start)
