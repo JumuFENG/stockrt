@@ -375,17 +375,28 @@ else:
             pass
 
         def format_transaction_response(self, rep_data, start=''):
-            cols = ['time', 'price', 'volume', 'amount', 'direction'] if rep_data and 'num' in rep_data[0] else ['time', 'price', 'volume', 'direction']
+            cols = ['time', 'price', 'volume', 'num', 'bs'] if rep_data and 'num' in rep_data[0] else ['time', 'price', 'volume', 'bs']
             data = [[
-                tr['time'], tr['price'], tr['vol'], tr['num'], tr['buyorsell']
+                tr['time'], tr['price'], tr['vol'] * 100, tr['num'], tr['buyorsell']
             ] if 'num' in cols else [
-                tr['time'], tr['price'], tr['vol'], tr['buyorsell']
+                tr['time'], tr['price'], tr['vol'] * 100, tr['buyorsell']
             ] for tr in rep_data if tr['time'] >= start]
             return self.format_array_list(data, cols)
 
         def transactions(self, stocks, date=None, start=''):
             if isinstance(stocks, str):
                 stocks = [stocks]
+            if isinstance(start, str):
+                start = [start] * len(stocks)
+            arr_start = []
+            for i, c in enumerate(stocks):
+                if isinstance(start, list) and i < len(start):
+                    arr_start.append(start[i])
+                elif isinstance(start, dict) and c in start:
+                    arr_start.append(start[c])
+                else:
+                    arr_start.append('')
+
             gsize = len(stocks) // len(self.tdxhosts) + 1
             result = {}
             wrappers = [c for c in self.clients if not c.busy]
@@ -396,7 +407,7 @@ else:
                         wrappers[i],
                         stocks[i*gsize:(i+1)*gsize],
                         date,
-                        start
+                        arr_start[i*gsize:(i+1)*gsize]
                     ): i for i in range(len(wrappers))
                 }
 
@@ -408,21 +419,24 @@ else:
             """处理单个股票组的K线获取"""
             group_result = {}
             with wclient as client:  # 每个线程获取独立的client
-                for code in stocks:
+                for code, start_hr_min in zip(stocks, start):
                     try:
                         trans = []
                         i = 0
+                        r_size = None
                         if date is not None:
                             date = int(date.replace('-', ''))
                         while True:
                             if date is None:
-                                data = client.get_transaction_data(self.to_pytdx_market(code), code[-6:], i * 2000, 2000)
+                                data = client.get_transaction_data(self.to_pytdx_market(code), code[-6:], len(trans), r_size or 2000)
                             else:
-                                data = client.get_history_transaction_data(self.to_pytdx_market(code), code[-6:], i * 2000, 2000, date)
+                                data = client.get_history_transaction_data(self.to_pytdx_market(code), code[-6:], len(trans), r_size or 2000, date)
                             if not data:
                                 break
-                            trans = self.format_transaction_response(data, start) + trans
-                            if data[0]['time'] < start:
+                            if r_size is None:
+                                r_size = len(data)
+                            trans = self.format_transaction_response(data, start_hr_min) + trans
+                            if data[0]['time'] < start_hr_min or len(data) < r_size:
                                 break
                             i += 1
                         group_result[code] = trans

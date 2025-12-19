@@ -427,13 +427,16 @@ def stock_list(market: str = 'all') -> Dict[str, Any]:
     wrapper = FetchWrapper.get_wrapper(inspect.currentframe().f_code.co_name)
     return wrapper.fetch(market)
 
-def transactions(stocks: Union[str, List[str]], date: str=None, start: str='') -> Dict[str, Any]:
+def transactions(stocks: Union[str, List[str]], date: str=None, start: Union[str, List[str], Dict[str, str]]='') -> Dict[str, Any]:
     '''获取指定日期的交易数据
 
     Args:
         stocks (Union[str, List[str]]): 股票代码或代码列表
-        date (str, optional): 日期. Defaults to None.
-        start (str, optional): 开始时间. Defaults to ''.
+        date (str, optional): 日期. Defaults to None. 表示最新交易日.
+        start (Union[str, List[str], Dict[str, str]], optional): 开始时间. Defaults to ''.
+            - '09:30': 所有stock的start都是'09:30'
+            - ['09:30', '10:30']: 与stocks一一对应, 如果不足则为''
+            - {code1: '9:30', code2: '10:30'}: 指定每个stock的start, 没指定则为''
 
     Returns:
         - Dict[str, Any]: {code1: [], code2: [] ...}
