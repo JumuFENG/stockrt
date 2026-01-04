@@ -29,7 +29,9 @@ https://hq.stock.sohu.com/cn/030/cn_600030-9_5m.html?openinwebview_finance=false
 https://hq.stock.sohu.com/cn/030/cn_600030-9_15m.html?openinwebview_finance=false&_=1751025818240
 资金流
 https://ushq.stock.sohu.com/AFundFlow/STOCKS/600030-1.html?_=1751028140704
-
+成交明细
+https://q.stock.sohu.com/cn/600030/cjmx.shtml
+https://hq.stock.sohu.com/cn/030/cn_600030-3-1.html?_=1766659268279
 """
 
 

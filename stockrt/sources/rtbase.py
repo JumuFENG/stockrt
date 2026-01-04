@@ -48,6 +48,52 @@ def get_array_format():
         return 'list'
     return _DEFAULT_ARRAY_FORMAT
 
+def get_fullcode(stock_code):
+    """判断股票ID对应的证券市场
+    匹配规则
+    ["43", "83", "87", "89", "92"] 为 bj, 89 开头的代码是北交所指数
+    ['5', '6', '7', '9', '110', '113', '118', '132', '204'] 为 sh
+    其余为 sz
+
+    :param stock_code str: 股票代码, 若以 'sz', 'sh', 'bj' 开头直接返回，否则使用内置规则判断
+
+    :return str: 以 'sz', 'sh', 'bj' 开头的股票代码
+    """
+    assert isinstance(stock_code, str), "stock code need str type"
+
+    stock_code = stock_code.lower()
+    if stock_code.startswith(("sh", "sz", "zz", "bj")):
+        assert len(stock_code) == 8, "full stock code length should be 8"
+        return stock_code
+
+    assert len(stock_code) == 6, "stock code length should be 6"
+    bj_head = ("43", "83", "87", "89", "92")
+    sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
+    if stock_code.startswith(bj_head):
+        return f"bj{stock_code}"
+    elif stock_code.startswith(sh_head):
+        return f"sh{stock_code}"
+    return f"sz{stock_code}"
+
+def to_int_kltype(kltype: Union[int, str]):
+    if kltype is None:
+        return 101
+
+    validkls = {
+        '1': 1, '5': 5, '15': 15, '30': 30, '60': 60, '120': 120, '240': 240,
+        'd': 101, 'w': 102, 'm': 103, 'q': 104, 'h': 105, 'y': 106,
+        'wk': 102, 'mon': 103, 'hy': 105, 'yr': 106, 'day': 101, 'week': 102,
+        'month': 103, 'quarter': 104, 'halfyear': 105, 'year': 106
+        }
+    if isinstance(kltype, str):
+        if kltype in validkls:
+            kltype = validkls[kltype]
+        elif kltype.isdigit():
+            kltype = int(kltype)
+    if type(kltype) is not int:
+        raise ValueError(f'invalid kltype: {kltype}')
+    return kltype
+
 
 class rtbase(abc.ABC):
     # 每次请求的最大股票数
@@ -56,51 +102,11 @@ class rtbase(abc.ABC):
 
     @staticmethod
     def get_fullcode(stock_code):
-        """判断股票ID对应的证券市场
-        匹配规则
-        ["43", "83", "87", "92"] 为 bj
-        ['5', '6', '7', '9', '110', '113', '118', '132', '204'] 为 sh
-        其余为 sz
-
-        :param stock_code str: 股票代码, 若以 'sz', 'sh', 'bj' 开头直接返回，否则使用内置规则判断
-
-        :return str: 以 'sz', 'sh', 'bj' 开头的股票代码
-        """
-        assert isinstance(stock_code, str), "stock code need str type"
-
-        stock_code = stock_code.lower()
-        if stock_code.startswith(("sh", "sz", "zz", "bj")):
-            assert len(stock_code) == 8, "full stock code length should be 8"
-            return stock_code
-
-        assert len(stock_code) == 6, "stock code length should be 6"
-        bj_head = ("43", "83", "87", "92")
-        sh_head = ("5", "6", "7", "9", "110", "113", "118", "132", "204")
-        if stock_code.startswith(bj_head):
-            return f"bj{stock_code}"
-        elif stock_code.startswith(sh_head):
-            return f"sh{stock_code}"
-        return f"sz{stock_code}"
+        return get_fullcode(stock_code)
 
     @staticmethod
     def to_int_kltype(kltype: Union[int, str]):
-        if kltype is None:
-            return 101
-
-        validkls = {
-            '1': 1, '5': 5, '15': 15, '30': 30, '60': 60, '120': 120, '240': 240,
-            'd': 101, 'w': 102, 'm': 103, 'q': 104, 'h': 105, 'y': 106,
-            'wk': 102, 'mon': 103, 'hy': 105, 'yr': 106, 'day': 101, 'week': 102,
-            'month': 103, 'quarter': 104, 'halfyear': 105, 'year': 106
-            }
-        if isinstance(kltype, str):
-            if kltype in validkls:
-                kltype = validkls[kltype]
-            elif kltype.isdigit():
-                kltype = int(kltype)
-        if type(kltype) is not int:
-            raise ValueError(f'invalid kltype: {kltype}')
-        return kltype
+        return to_int_kltype(kltype)
 
     @lru_cache(maxsize=10)
     def get_market_stock_count(self, market: str = 'all') -> int:
@@ -175,13 +181,15 @@ class rtbase(abc.ABC):
     @staticmethod
     def format_array_list(
         tlines: list[list],
-        cols: Optional[list[str]] = ['time', 'price', 'volume', 'amount']
+        cols: Optional[list[str]] = ['time', 'price', 'volume', 'amount'],
+        dtdict: Optional[dict] = {'time': 'U20','volume': 'int64'}
     ) -> Union[list[dict], tuple[tuple], list[tuple], Any]:
         """将K线/分时数据列表转换为指定格式。
 
         Args:
             tlines: 输入的K线/分时数据列表，每项为 (time, price, volume, amount)。
             cols: 字段名列表，默认 ['time', 'price', 'volume', 'amount']。
+            dtdict: 字段类型字典，默认为 {'time': 'U20', 'volume': 'int64'}。未设置的字段使用float64
 
         Returns:
             根据 `get_array_format()` 返回的格式转换后的数据。
@@ -196,6 +204,10 @@ class rtbase(abc.ABC):
         if len(tlines[0]) != len(cols):
             raise ValueError(f"数据列数不匹配: 预期 {len(cols)} 列，实际 {len(tlines[0])} 列")
 
+        for i in range(1, len(tlines)):
+            if len(tlines[i]) != len(cols):
+                tlines[i] = tlines[i][:len(cols)]
+
         if fmt == 'list':
             return tlines
         elif fmt == 'tuple':
@@ -205,9 +217,11 @@ class rtbase(abc.ABC):
         elif fmt == 'pd' or fmt == 'df':
             return pd.DataFrame(tlines, columns=cols)
         elif fmt == 'np':
-            dtdict = {'time': 'U20','volume': 'int64'}
             dtypes = [(col, dtdict.get(col, 'float64')) for col in cols]
-            return np.array([tuple(row) for row in tlines], dtype=dtypes)
+            arr = np.empty(len(tlines), dtype=dtypes)
+            for i, tl in enumerate(tlines):
+                arr[i] = tuple(tl)
+            return arr
 
     @abc.abstractmethod
     def mklines(self, stocks, kltype, length=320, fq=0, withqt=False):
@@ -268,6 +282,9 @@ class requestbase(rtbase):
         pass
 
     def get_stock_list_url(self, page: int = 1, market: str = 'all'):
+        pass
+
+    def get_transactions_url(self, stock, date=None, start=''):
         pass
 
     def _get_headers(self):
@@ -350,6 +367,9 @@ class requestbase(rtbase):
                 result_arr.extend(result[i])
         return {market: result_arr}
 
+    def format_transactions_response(self, rep_data, date=None, start=''):
+        pass
+
     def quotes(self, stocks):
         stocks = self._stock_groups(stocks)
         return self._fetch_concurrently(stocks, self.get_quote_url, self.format_quote_response)
@@ -397,6 +417,9 @@ class requestbase(rtbase):
         response.raise_for_status()
         stocks = self.parse_stock_list(response.text)
         total, count = self.get_total_count(response.text)
+        if total == 0:
+            total = self.get_market_stock_count(market)
+            count = len(stocks)
         return stocks, total, count
 
     def stock_list_for_market(self, market: str = 'all') -> Dict[str, Any]:
@@ -417,6 +440,8 @@ class requestbase(rtbase):
             result.update(self.stock_list_for_market(mkt))
         return result
 
+    def transactions(self, stocks, date=None, start=''):
+        return self._fetch_concurrently(stocks, self.get_transactions_url, self.format_transactions_response, url_kwargs={'date': date, 'start': start}, fmt_kwargs={'date': date, 'start': start})
 
 class NoneSourcePy(rtbase):
     @property

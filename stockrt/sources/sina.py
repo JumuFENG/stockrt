@@ -26,6 +26,9 @@ https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.g
 https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=4&num=40&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page
 https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=1&num=100&sort=changepercent&asc=0&node=hs_a&symbol=&_s_r_a=page
 
+逐笔:
+https://vip.stock.finance.sina.com.cn/quotes_service/view/CN_TransListV2.php?num=3000&symbol=sh600798&rn=29442715
+https://money.finance.sina.com.cn/quotes_service/view/CN_TransListV2.php?num=5000&symbol=sh600798&rn=29442715
 """
 
 
@@ -169,7 +172,7 @@ class Sina(requestbase):
 
     def get_dkline_url(self, stock, kltype=101, length=320, fq=0):
         if fq != 0:
-            logger.error('sina kline api only support fq=0')
+            logger.warning('sina kline api only support fq=0')
         klt2scale = {101: 240, 102: 1200, 103: 7200, 106: 86400}
         assert kltype in klt2scale, f'sina kline api only support {klt2scale.keys()}'
         return self.mklineapi % (stock, klt2scale[kltype], length), self._get_headers()
@@ -194,6 +197,19 @@ class Sina(requestbase):
             'amount': float(stock['amount']),
         } for stock in data]
 
-    def stock_list_for_market(self, market: str = 'all'):
-        pages = [i for i in range(1, self.get_market_stock_count(market) // self.stocklist_page_size + 2)]
-        return self._fetch_concurrently(pages, self.get_stock_list_url, self.format_stock_list_response, convert_code=False, url_kwargs={'market': market}, fmt_kwargs={'market': market})
+    def get_transactions_url(self, stock, date=None, start=''):
+        url = 'https://money.finance.sina.com.cn/quotes_service/view/CN_TransListV2.php?num=5000&symbol=%s&rn=%d' % (stock, int(time.time() * 1000))
+        return url, self._get_headers()
+
+    def format_transactions_response(self, rep_data, date=None, start=''):
+        reg = re.compile(r'trade_item_list\[\d+\]\s*=\s*new Array\((.*?)\);')
+        result = {}
+        bsdic = {'UP': 1, 'DOWN': 2, 'EQUAL': 0}
+        for c, v in rep_data:
+            trades = []
+            for match in reg.finditer(v):
+                items = match.group(1).replace("'", "").split(',')
+                trades.append([items[0], float(items[2]), int(items[1]), bsdic[items[3].strip()]])
+            trades.reverse()
+            result[c] = self.format_array_list(trades, ['time', 'price', 'volume', 'bs'])
+        return result

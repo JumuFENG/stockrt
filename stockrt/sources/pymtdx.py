@@ -17,7 +17,7 @@ else:
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from functools import cached_property
     from typing import Callable, Any, Union, List, Dict
-    from .rtbase import rtbase
+    from .rtbase import rtbase, set_array_format
     from pytdx.hq import TdxHq_API
     from pytdx.config.hosts import hq_hosts
 
@@ -375,13 +375,10 @@ else:
             pass
 
         def format_transaction_response(self, rep_data, start=''):
-            cols = ['time', 'price', 'volume', 'num', 'bs'] if rep_data and 'num' in rep_data[0] else ['time', 'price', 'volume', 'bs']
-            data = [[
-                tr['time'], tr['price'], tr['vol'] * 100, tr['num'], tr['buyorsell']
-            ] if 'num' in cols else [
-                tr['time'], tr['price'], tr['vol'] * 100, tr['buyorsell']
-            ] for tr in rep_data if tr['time'] >= start]
-            return self.format_array_list(data, cols)
+            return [
+                [tr['time'], tr['price'], tr['vol'] * 100, tr['num'], tr['buyorsell']]  if 'num' in tr 
+                else [tr['time'], tr['price'], tr['vol'] * 100, tr['buyorsell']] 
+            for tr in rep_data if tr['time'] >= start]
 
         def transactions(self, stocks, date=None, start=''):
             if isinstance(stocks, str):
@@ -400,6 +397,7 @@ else:
             gsize = len(stocks) // len(self.tdxhosts) + 1
             result = {}
             wrappers = [c for c in self.clients if not c.busy]
+            ofmt = set_array_format('list')
             with ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
                 futures = {
                     executor.submit(
@@ -413,6 +411,11 @@ else:
 
                 for future in as_completed(futures):
                     result.update(future.result())
+            if ofmt != 'list':
+                set_array_format(ofmt)
+                for k, v in result.items():
+                    cols = ['time', 'price', 'volume', 'num', 'bs'] if v and len(v[0]) == 5 else ['time', 'price', 'volume', 'bs']
+                    result[k] = self.format_array_list(v, cols, {'time': 'U20', 'volume': 'int64', 'num': 'int32', 'bs': 'int32'})
             return result
 
         def _get_transaction_for_group(self, wclient, stocks, date=None, start=''):

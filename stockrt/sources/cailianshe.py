@@ -32,6 +32,11 @@ https://x-quote.cls.cn/quote/index/tlines?app=CailianpressWeb&os=web&secu_codes=
 https://www.cls.cn/allStocks
 https://x-quote.cls.cn/web_quote/web_stock/stock_list?app=CailianpressWeb&market=all&os=web&page=2&rever=1&sv=8.4.6&types=last_px,change,tr,main_fund_diff,cmc,trade_status&sign=a2cd0e7449c4a2763db426a47f3edb40
 无法获取开盘价最高价最低价等信息
+
+明细
+https://x-quote.cls.cn/quote/stock/volume?secu_code=sh601011&field=vol&app=CailianpressWeb&os=web&sv=8.4.6&sign=9f8797a1f4de66c2370f7a03990d2737
+https://x-quote.cls.cn/quote/stock/volume?secu_code=sh601011&field=vol&start=2834&end=2853&app=CailianpressWeb&os=web&sv=8.4.6&sign=9f8797a1f4de66c2370f7a03990d2737
+start=1表示从第一笔开始取, end表示取到第几笔结束, 拿不到竞价第一笔
 """
 
 

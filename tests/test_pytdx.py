@@ -64,7 +64,7 @@ class TestTdxFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_single_stock_transactions(self):
-        stock_codes = '000001'
+        stock_codes = '162411'
         result = self.source.transactions(stock_codes, None)
         self.assertIsInstance(result, dict)
 

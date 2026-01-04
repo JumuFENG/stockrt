@@ -22,6 +22,11 @@ https://web.ifzq.gtimg.cn/appstock/app/day/query?_var=&code=sh603444&r=0.8305712
 https://stockapp.finance.qq.com/mstats/#mod=list&id=hs_hsj&module=hs&type=hsj
 https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=priceRatio&direct=down&offset=20&count=20
 无法获取开盘价最高价最低价等信息
+
+成交明细
+https://gu.qq.com/sz300503/gp/detail
+https://stock.gtimg.cn/data/index.php?appn=detail&action=timeline&c=sz300503
+https://stock.gtimg.cn/data/index.php?appn=detail&action=data&c=sz300503&p=0
 """
 
 class Tencent(requestbase):
@@ -227,3 +232,60 @@ class Tencent(requestbase):
             'volume': int(float(stock['volume']) * 100),
             'amount': float(stock['turnover']) * 10000,
         } for stock in data]
+
+    def get_transactions_url(self, stock, date=None, start=''):
+        code, fcode, page = stock
+        return f'https://stock.gtimg.cn/data/index.php?appn=detail&action=data&c={fcode}&p={page}', self._get_headers()
+
+    def format_transactions_response(self, rep_data, date=None, start=''):
+        result = {}
+        bsdic = {'B': 1, 'S': 2}
+        for stock, v in rep_data:
+            code, fc, pg = stock
+            trans = json.loads(v.split('=')[1].strip().strip(';'))
+            trans = trans[1].split('|')
+            trans = [t.split('/') for t in trans]
+            tarr = []
+            for i,t,price,c,volume,amount,bs in trans:
+                tarr.append([t, float(price), int(volume) * 100, 0, bsdic.get(bs, 0), float(amount)])
+            if code not in result:
+                result[code] = [[]] * (pg + 1)
+            while len(result[code]) <= pg:
+                result[code].append([])
+            result[code][pg] = tarr
+
+        for c, v in result.items():
+            trades = []
+            for page_trades in v:
+                trades.extend(page_trades)
+            result[c] = self.format_array_list(trades, ['time', 'price', 'volume', 'num', 'bs', 'amount'])
+        return result
+
+    def transactions(self, stocks, date=None, start=''):
+        if isinstance(stocks, str):
+            stocks = [stocks]
+        if isinstance(start, str):
+            start = [start] * len(stocks)
+        arr_start = []
+        for i, c in enumerate(stocks):
+            if isinstance(start, list) and i < len(start):
+                arr_start.append(start[i])
+            elif isinstance(start, dict) and c in start:
+                arr_start.append(start[c])
+            else:
+                arr_start.append('')
+        stkpages = []
+        for c, s in zip(stocks, arr_start):
+            fcode = self.get_fullcode(c)
+            tlurl = f'https://stock.gtimg.cn/data/index.php?appn=detail&action=timeline&c={fcode}'
+            rsp = self.session.get(tlurl, headers=self._get_headers())
+            rsp.raise_for_status()
+            rtxt = rsp.text
+            tldata = json.loads(rtxt.split('=')[1].strip().strip(';'))
+            tldata = tldata[1].split('|')
+            tldata = [t.split('~') for t in tldata]
+            for i in range(len(tldata)):
+                if tldata[i][1] < s:
+                    continue
+                stkpages.append((c, fcode, i))
+        return self._fetch_concurrently(stkpages, self.get_transactions_url, self.format_transactions_response, convert_code=False)

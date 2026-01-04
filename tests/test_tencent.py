@@ -73,9 +73,40 @@ class TestTencentFunctions(unittest.TestCase):
             self.assertIn('close', stock)
             self.assertIn('change', stock)
 
+    def test_stock_transactions(self):
+        stock_code = '600798'
+        result = self.source.transactions(stock_code)
+        self.assertIsInstance(result, dict)
+        stock_data = result.get(stock_code)
+        self.assertIsNotNone(stock_data)
+        self.assertIsInstance(stock_data, list)
+        self.assertGreater(len(stock_data), 0)
+        for entry in stock_data:
+            self.assertIsInstance(entry, list)
+            self.assertGreater(len(entry), 4)
+            self.assertIsInstance(entry[0], str)
+            self.assertIsInstance(entry[1], float)
+            self.assertIsInstance(entry[2], int)
+            self.assertIsInstance(entry[3], int)
+
+    def test_stock_transactions_start(self):
+        stock_code = '600798'
+        result = self.source.transactions(stock_code, start='14:31')
+        self.assertIsInstance(result, dict)
+        stock_data = result.get(stock_code)
+        self.assertIsNotNone(stock_data)
+        self.assertIsInstance(stock_data, list)
+        self.assertGreater(len(stock_data), 0)
+        for entry in stock_data:
+            self.assertIsInstance(entry, list)
+            self.assertGreater(len(entry), 4)
+            self.assertIsInstance(entry[0], str)
+            self.assertIsInstance(entry[1], float)
+            self.assertIsInstance(entry[2], int)
+            self.assertIsInstance(entry[3], int)
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestTencentFunctions('test_stock_list_retrieval'))
+    suite.addTest(TestTencentFunctions('test_stock_transactions_start'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()

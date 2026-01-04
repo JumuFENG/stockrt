@@ -37,6 +37,10 @@ https://quote.eastmoney.com/center/gridlist.html#hs_a_board
 https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&cb=&fs=m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:81+s:2048&fields=f1,f2,f3,f4,f5,f6,f15,f16,f17,f12,f13,f14,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f124&fid=f3&pn=2&pz=20&po=1&dect=1&ut=fa5fd1943c7b386f172d6893dbfba10b&wbp2u=|0|0|0|web&_=1761043426715
 
 请求限制: 1000/5min 50000/24h
+
+明细 SSE
+https://quote.eastmoney.com/f1.html?newcode=0.301005
+https://72.push2.eastmoney.com/api/qt/stock/details/sse?fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55&mpi=2000&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&pos=-0&secid=0.301005&wbp2u=|0|0|0|web
 '''
 
 class Em:

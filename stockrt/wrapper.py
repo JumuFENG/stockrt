@@ -17,16 +17,14 @@ from .sources.pymtdx import SrcTdx
 from .sources.pymths import SrcThs
 
 
-def get_fullcode(code):
-    return rtbase.get_fullcode(code)
-
 class FetchWrapper(object):
     def __init__(
         self,
         api_name: str,
         func_name: str,
         data_sources: List[str],
-        parrallel: bool = False
+        parrallel: bool = False,
+        *args
     ):
         """
         数据获取包装器
@@ -34,7 +32,7 @@ class FetchWrapper(object):
         :param api_name: 数据源API属性名
         :param func_name: 要调用的方法名
         :param data_sources: 数据源优先级列表（会复制一份避免修改外部列表）
-        :param parrallel: 是否同时使用多个数据源
+        :param parrallel: 是否轮流使用多个数据源
         """
         self.api_name = api_name
         self.func_name = func_name
@@ -42,6 +40,7 @@ class FetchWrapper(object):
         self._current_sources = data_sources.copy()   # 当前可用数据源
         self._failed_sources = set()                  # 完全失败的数据源
         self._parrallel = parrallel
+        self._chunk_size = args[0] if parrallel and args else 100
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -99,6 +98,10 @@ class FetchWrapper(object):
 
     api_default_sources = {
         # api_name, sources, parrallel
+        # about parrallel: 在有多个可用source的情况下，parrallel设置为True可以设置第4个参数表示chunksize, 会轮流使用这些source进行请求，
+        # 每个source依次请求chunksize个(默认100个),之后换下一个source，全部source使用完之后重新开始.
+        # 这种方式适用于单个source有请求频率/总量限制的情况，比如大部分数据源获取K线数据时只能一次请求一支股票的数据，
+        # 而quotes/quotes5大部分source都可以一次请求获取多只股票的信息，一般不需要轮换source
         'quotes': ['qtapi', ('tencent', 'cls', 'tgb', 'ths', 'sina', 'xueqiu', 'eastmoney', 'sohu'), False],
         'quotes5': ['qt5api', ('sina', 'tencent', 'ths', 'eastmoney', 'cls', 'sohu', 'tgb'), False],
         'tlines': ['tlineapi', ('cls', 'sina', 'tencent', 'eastmoney', 'sohu', 'tgb'), False],
@@ -108,7 +111,7 @@ class FetchWrapper(object):
         'q_dklines': ['dklineapi', ('tencent',), False],
         'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],
         'stock_list': ['stocklistapi', ('eastmoney', 'sina', 'cls', 'tencent', 'xueqiu'), False],
-        'transactions': ['transactions', ('tdx', 'sina'), True],
+        'transactions': ['transactions', ('tdx', 'ths', 'sina'), False],
     }
 
     @staticmethod
@@ -117,8 +120,8 @@ class FetchWrapper(object):
         akey = f'q_{func_name}' if withQ else func_name
         if akey not in FetchWrapper.api_default_sources:
             raise NotImplementedError(f"not yet implemented api: {akey}")
-        api_name, sources, parrallel = FetchWrapper.api_default_sources[akey]
-        return FetchWrapper(api_name, func_name, list(sources), parrallel=parrallel)
+        api_name, sources, parrallel, *args = FetchWrapper.api_default_sources[akey]
+        return FetchWrapper(api_name, func_name, list(sources), parrallel, *args)
 
     @property
     def current_source_order(self) -> List[str]:
@@ -207,21 +210,16 @@ class FetchWrapper(object):
         :return: Combined results from all data sources
         """
         result = {}
-        num_sources = len(self._current_sources)
-        chunk_size = math.ceil(len(stocks_list) / num_sources)
-
-        # Split stocks into chunks for each data source
-        chunks = [
-            stocks_list[i * chunk_size:(i + 1) * chunk_size]
-            for i in range(num_sources)
-        ]
-
-        for i, source in enumerate(self._current_sources):
-            if i >= len(chunks) or not chunks[i]:
-                continue
-
+        sources = self._current_sources.copy()
+        source_id = 0
+        for i in range(0, len(stocks_list), self._chunk_size):
+            if len(sources) == 0:
+                sources = self._current_sources.copy()
+            if source_id >= len(sources):
+                source_id = 0
+            source = sources[source_id]
             try:
-                data = self._fetch_from_source(source, chunks[i], *args, **kwargs)
+                data = self._fetch_from_source(source, stocks_list[i:i + self._chunk_size], *args, **kwargs)
                 if data:
                     result.update(data)
             except Exception as e:
@@ -230,7 +228,7 @@ class FetchWrapper(object):
                     source, str(e)
                 )
                 self._handle_empty_result(source)
-
+            source_id += 1
         return result
 
     def _fetch_from_source(self, source: str, stocks: List[str], *args, **kwargs) -> Dict[str, Any]:

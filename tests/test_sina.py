@@ -66,9 +66,25 @@ class TestSinaFunctions(unittest.TestCase):
             self.assertIn('name', data)
             self.assertIn('close', data)
 
+    def test_get_transactions(self):
+        stock_code = '600798'
+        result = self.source.transactions(stock_code)
+        self.assertIsInstance(result, dict)
+        stock_data = result.get(stock_code)
+        self.assertIsNotNone(stock_data)
+        self.assertIsInstance(stock_data, list)
+        self.assertGreater(len(stock_data), 0)
+        for entry in stock_data:
+            self.assertIsInstance(entry, list)
+            self.assertGreater(len(entry), 4)
+            self.assertIsInstance(entry[0], str)
+            self.assertIsInstance(entry[1], float)
+            self.assertIsInstance(entry[2], int)
+            self.assertIsInstance(entry[3], int)
+
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestSinaFunctions('test_get_stock_list'))
+    suite.addTest(TestSinaFunctions('test_get_transactions'))
     unittest.TextTestRunner().run(suite)
     # unittest.main()
