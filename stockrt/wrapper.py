@@ -110,7 +110,7 @@ class FetchWrapper(object):
         'dklines': ['dklineapi', ('eastmoney', 'tdx', 'xueqiu', 'cls', 'sohu', 'ths', 'tencent'), True],
         'q_dklines': ['dklineapi', ('tencent',), False],
         'fklines': ['fklineapi', ('eastmoney', 'tdx', 'sohu', 'tgb'), True],
-        'stock_list': ['stocklistapi', ('eastmoney', 'sina', 'cls', 'tencent', 'xueqiu'), False],
+        'stock_list': ['stocklistapi', ('sina', 'cls', 'tencent', 'xueqiu'), False],
         'transactions': ['transactions', ('tdx', 'ths', 'sina'), False],
     }
 

@@ -21,16 +21,17 @@ else:
     from pytdx.hq import TdxHq_API
     from pytdx.config.hosts import hq_hosts
 
-    from pytdx.log import log as logger
+    from pytdx.log import log as logger, logging
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
     logger.propagate = True
+    logger.setLevel(logging.root.level)
     logger.info("set pytdx logger propagate!")
 
     class ClientWrapper:
         """包装客户端，实现连接状态管理和上下文管理协议"""
         def __init__(self, host):
-            self._tdx = TdxHq_API()
+            self._tdx = TdxHq_API(auto_retry=True)
             self._host = host
             self._busy = False
             self._sock = None
@@ -59,7 +60,8 @@ else:
                 if success:
                     self._sock = self._tdx.client
                 return success
-            except Exception:
+            except Exception as e:
+                logger.debug('connect to %s failed: %s', self._host, e)
                 return False
 
         def disconnect(self):
