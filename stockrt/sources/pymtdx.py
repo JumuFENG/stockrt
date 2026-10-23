@@ -189,6 +189,19 @@ else:
         def clients(self):
             return [ClientWrapper(h) for h in self.tdxhosts]
 
+        def alive_client_wrapper(self):
+            wrappers = []
+            for c in self.clients:
+                if c.busy:
+                    continue
+                if not c.connect():
+                    time.sleep(0.1)
+                    c.disconnect()
+                    if not c.connect():
+                        continue
+                wrappers.append(c)
+            return wrappers
+
         def format_quote_response(self, stocks, rep_data):
             if not rep_data:
                 return {}
@@ -237,7 +250,7 @@ else:
             if len(stocks) > self.quote_max_num:
                 batches = len(stocks) // self.quote_max_num + 1
 
-            wrappers = [next((c for c in self.clients if not c.busy), None)] if batches == 1 else [ c for c in self.clients if not c.busy][:batches]
+            wrappers = [next((c for c in self.clients if not c.busy), None)] if batches == 1 else self.alive_client_wrapper()[:batches]
             if not wrappers:
                 return
 
@@ -280,7 +293,7 @@ else:
                 stocks = [stocks]
 
             today = datetime.now().strftime('%Y%m%d')
-            wrappers = [c for c in self.clients if not c.busy]
+            wrappers = self.alive_client_wrapper()
             gsize = len(stocks) // len(wrappers) + 1
             result = {}
             with ThreadPoolExecutor(max_workers=len(wrappers)) as executor:
@@ -329,7 +342,7 @@ else:
 
             gsize = len(stocks) // len(self.tdxhosts) + 1
             result = {}
-            wrappers = [c for c in self.clients if not c.busy]
+            wrappers = self.alive_client_wrapper()
             with ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
                 futures = {
                     executor.submit(
@@ -398,7 +411,10 @@ else:
 
             gsize = len(stocks) // len(self.tdxhosts) + 1
             result = {}
-            wrappers = [c for c in self.clients if not c.busy]
+            wrappers = self.alive_client_wrapper()
+            if not wrappers:
+                logger.error("No available TDX clients to fetch transactions")
+                return result
             ofmt = set_array_format('list')
             with ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
                 futures = {
