@@ -39,14 +39,29 @@ class TestThsFunctions(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_single_stock_tlines(self):
-        stock_codes = '600530'
+        stock_codes = '000001'
         result = self.source.tlines(stock_codes)
-        self.assertIsNone(result)
+        self.assertIsInstance(result, dict)
+        self.assertIn(stock_codes, result)
 
     def test_list_of_stock_codes_tlines(self):
         stock_codes = ['000001', 'sh000001']
         result = self.source.tlines(stock_codes)
-        self.assertIsNone(result)
+        self.assertIsInstance(result, dict)
+        self.assertIn('000001', result)
+
+    def test_stock_list(self):
+        result = self.source.stock_list('kcb')
+        self.assertIsInstance(result, dict)
+        self.assertTrue(result['kcb'])
+        self.assertIn('code', result['kcb'][0])
+        self.assertIn('name', result['kcb'][0])
+
+    def test_transactions(self):
+        result = self.source.transactions('000001', start='14:55')
+        self.assertIsInstance(result, dict)
+        self.assertIn('000001', result)
+        self.assertTrue(all(row[0] >= '14:55' for row in result['000001']))
 
     def test_single_stock_mklines(self):
         stock_codes = '000001'

@@ -334,9 +334,8 @@ class requestbase(rtbase):
             logger.error(f"fetch timeout: {str(e)}")
         except Exception as e:
             logger.error(f"fetch error: {str(e)}")
-        finally:
-            if results:
-                return format_func(results, **fmt_kwargs)
+        if results:
+            return format_func(results, **fmt_kwargs)
 
     def format_quote_response(self, rep_data):
         return dict(rep_data)

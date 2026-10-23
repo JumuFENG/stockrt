@@ -175,3 +175,4 @@ cython_debug/
 
 .vscode/
 tdx_hosts.json
+account.session
